@@ -8,21 +8,15 @@ import com.huaweicloud.hdkitservice.model.CredentialsRequest;
 import com.huaweicloud.hdkitservice.model.CredentialsResponse;
 import com.huaweicloud.hdkitservice.model.ReleaseRequest;
 import com.huaweicloud.hdkitservice.model.ReleaseResponse;
-import com.huaweicloud.hdkitservice.model.SandboxSession;
 import com.huaweicloud.hdkitservice.model.SignAgreementResponse;
-import com.huaweicloud.hdkitservice.sign.Signer;
-import com.huaweicloud.hdkitservice.store.SessionStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
-import java.util.stream.Collectors;
 
 @Service
 public class SandboxService {
@@ -32,40 +26,35 @@ public class SandboxService {
     private static final String STATUS_RUNNING = "0002";
 
     private final DevStationClient devStation;
-    private final SessionStore store;
     private final HdkitConfig config;
 
-    public SandboxService(DevStationClient devStation, SessionStore store, HdkitConfig config) {
+    public SandboxService(DevStationClient devStation, HdkitConfig config) {
         this.devStation = devStation;
-        this.store = store;
         this.config = config;
     }
 
     public ConnectResponse connect(ConnectRequest req, String ak, String sk) {
-        String userKey = Signer.sha256Hex(ak);
         String templateId = (req.templateId() == null || req.templateId().isEmpty())
                 ? config.templateId() : req.templateId();
         String flavorId = (req.flavorId() == null || req.flavorId().isEmpty())
                 ? config.flavorId() : req.flavorId();
 
         List<DevStationClient.Devenv> actual = devStation.list("", ak, sk);
-        reconcileStaleSessions(userKey, actual);
 
         DevStationClient.Devenv existing = findHcdkInstance(actual);
         String devStageId;
-        String name;
         boolean created = false;
 
         if (existing != null) {
             // 复用已有实例
             devStageId = existing.id();
-            name = existing.name();
         } else {
-            if (store.countActive() >= config.maxConcurrent()) {
+            // 按账号实时计数：云上现存环境数（含手动创建的）达到上限则拒绝
+            if (actual.size() >= config.maxConcurrent()) {
                 throw new HdkitException("HDKIT_CONFLICT", "已达最大并发沙箱数 " + config.maxConcurrent(), null);
             }
             // 新建实例（name 内部生成，保证唯一可识别）
-            name = "hcdk" + Long.toString(System.currentTimeMillis(), 36);
+            String name = "hcdk" + Long.toString(System.currentTimeMillis(), 36);
             devStageId = devStation.create(name, templateId, flavorId, req.source(), req.env(), req.git(), ak, sk);
             created = true;
             waitForStatus(devStageId, STATUS_READY, config.connectTimeout(), ak, sk);
@@ -80,8 +69,8 @@ public class SandboxService {
             DevStationClient.ConnectionAddress addr = devStation.address(devStageId, connectionId, ak, sk);
             String address = addr.url() + "&source=" + addr.source();
 
-            String sessionId = upsertSession(userKey, devStageId, name, String.valueOf(connectionId), address);
-            return new ConnectResponse(sessionId, devStageId, String.valueOf(connectionId), address, "connected");
+            // 无本地会话：session_id 等价 dev_stage_id
+            return new ConnectResponse(devStageId, devStageId, String.valueOf(connectionId), address, "connected");
         } catch (Exception e) {
             log.error("[connect] failed: {}", e.getMessage());
             if (created) {
@@ -102,18 +91,6 @@ public class SandboxService {
         return null;
     }
 
-    private void reconcileStaleSessions(String userKey, List<DevStationClient.Devenv> actual) {
-        Set<String> actualIds = actual.stream()
-                .map(DevStationClient.Devenv::id)
-                .collect(Collectors.toSet());
-        for (SandboxSession s : store.listAll()) {
-            if (userKey.equals(s.userKey()) && !actualIds.contains(s.devStageId())) {
-                log.info("[connect] prune stale session {} (dev env {} gone)", s.sessionId(), s.devStageId());
-                store.delete(s.sessionId());
-            }
-        }
-    }
-
     private void ensureRunning(String devStageId, String ak, String sk) {
         String status = devStation.statusOf(devStageId, ak, sk);
         if (!isStatus(status, STATUS_RUNNING)) {
@@ -122,25 +99,16 @@ public class SandboxService {
         }
     }
 
-    private String upsertSession(String userKey, String devStageId, String name, String connectionId, String address) {
-        String existing = store.findByDevStageId(devStageId);
-        String sessionId = (existing != null && !existing.isEmpty())
-                ? existing
-                : UUID.randomUUID().toString().replace("-", "").substring(0, 16);
-        long now = System.currentTimeMillis();
-        store.save(new SandboxSession(sessionId, userKey, name, devStageId, connectionId, address, "connected", now, now));
-        store.addActive(sessionId);
-        return sessionId;
-    }
-
     public CredentialsResponse credentials(CredentialsRequest req, String ak, String sk) {
-        String userKey = Signer.sha256Hex(ak);
         String devStageId = resolveDevStageId(req.sessionId(), req.devStageId());
         if (devStageId == null) {
             throw new HdkitException("HDKIT_INVALID_REQUEST", "缺少 session_id 或 dev_stage_id", null);
         }
 
         String status = devStation.statusOf(devStageId, ak, sk);
+        if (status == null) {
+            throw new HdkitException("HDKIT_SANDBOX_NOT_FOUND", "环境不存在或已被删除", null);
+        }
         if (!isStatus(status, STATUS_RUNNING)) {
             throw new HdkitException("HDKIT_NOT_RUNNING", "环境未处于 RUNNING，无法注入临时 AK/SK", null);
         }
@@ -148,20 +116,7 @@ public class SandboxService {
         boolean enableSts = req.enableSts() == null || req.enableSts();
         String expiresAt = devStation.autoConfig(devStageId, enableSts, ak, sk);
 
-        String existing = store.findByDevStageId(devStageId);
-        String sessionId;
-        long now = System.currentTimeMillis();
-        if (existing != null) {
-            SandboxSession old = store.get(existing);
-            sessionId = existing;
-            store.save(new SandboxSession(sessionId, userKey, old != null ? old.name() : "", devStageId,
-                    old != null ? old.connectionId() : "", old != null ? old.address() : "",
-                    old != null ? old.status() : "connected", old != null ? old.createdAt() : now, now));
-        } else {
-            sessionId = UUID.randomUUID().toString().replace("-", "").substring(0, 16);
-            store.save(new SandboxSession(sessionId, userKey, "", devStageId, "", "", "connected", now, now));
-        }
-        return new CredentialsResponse(sessionId, expiresAt);
+        return new CredentialsResponse(devStageId, expiresAt);
     }
 
     public ReleaseResponse release(ReleaseRequest req, String ak, String sk) {
@@ -171,19 +126,9 @@ public class SandboxService {
         }
         try {
             releaseById(devStageId, ak, sk);
-            String sid = store.findByDevStageId(devStageId);
-            if (sid != null) store.delete(sid);
             return new ReleaseResponse(true, devStageId);
         } catch (Exception e) {
             log.error("[release] failed for {}: {}", devStageId, e.getMessage());
-            String sid = store.findByDevStageId(devStageId);
-            if (sid != null) {
-                SandboxSession old = store.get(sid);
-                if (old != null) {
-                    store.save(new SandboxSession(sid, old.userKey(), old.name(), devStageId, old.connectionId(),
-                            old.address(), "release_failed", old.createdAt(), System.currentTimeMillis()));
-                }
-            }
             throw new HdkitException("HDKIT_RELEASE_FAILED", "释放沙箱失败", e);
         }
     }
@@ -199,20 +144,13 @@ public class SandboxService {
     }
 
     public CheckUserResponse checkUser(String ak, String sk) {
-        String userKey = Signer.sha256Hex(ak);
-        boolean realnameCached = store.isRealnameVerified(userKey);
-        boolean agreementCached = store.isAgreementSigned(userKey);
-
         CompletableFuture<Boolean> realnameFuture = CompletableFuture.supplyAsync(
-                () -> realnameCached || "2".equals(devStation.realNameStatus(ak, sk)));
+                () -> "2".equals(devStation.realNameStatus(ak, sk)));
         CompletableFuture<Boolean> agreementFuture = CompletableFuture.supplyAsync(
-                () -> agreementCached || allAgreementsSigned(devStation.agreements(ak, sk)));
+                () -> allAgreementsSigned(devStation.agreements(ak, sk)));
 
         boolean realnameOk = await(realnameFuture, "查询实名状态失败");
         boolean agreementOk = await(agreementFuture, "查询协议状态失败");
-
-        if (realnameOk && !realnameCached) store.cacheRealnameVerified(userKey);
-        if (agreementOk && !agreementCached) store.cacheAgreementSigned(userKey);
 
         if (!realnameOk) throw new HdkitException("HDKIT_NOT_REALNAME", "用户未完成实名认证", null);
         if (!agreementOk) throw new HdkitException("HDKIT_NOT_AGREEMENT", "用户未签署协议", null);
@@ -220,7 +158,6 @@ public class SandboxService {
     }
 
     public SignAgreementResponse signAgreement(String ak, String sk) {
-        String userKey = Signer.sha256Hex(ak);
         List<DevStationClient.Agreement> agreements = devStation.agreements(ak, sk);
         List<DevStationClient.SignReq> toSign = new ArrayList<>();
         for (DevStationClient.Agreement a : agreements) {
@@ -231,7 +168,6 @@ public class SandboxService {
         if (!toSign.isEmpty()) {
             devStation.signAgreements(toSign, ak, sk);
         }
-        store.cacheAgreementSigned(userKey);
         return new SignAgreementResponse(true, toSign.size());
     }
 
@@ -288,10 +224,8 @@ public class SandboxService {
     }
 
     private String resolveDevStageId(String sessionId, String devStageId) {
-        if (sessionId != null && !sessionId.isEmpty()) {
-            SandboxSession s = store.get(sessionId);
-            return s != null ? s.devStageId() : null;
-        }
+        // session_id 是 dev_stage_id 的别名（历史兼容）
+        if (sessionId != null && !sessionId.isEmpty()) return sessionId;
         return (devStageId != null && !devStageId.isEmpty()) ? devStageId : null;
     }
 
