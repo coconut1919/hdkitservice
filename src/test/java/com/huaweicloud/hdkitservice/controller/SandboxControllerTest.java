@@ -1,0 +1,92 @@
+package com.huaweicloud.hdkitservice.controller;
+
+import com.huaweicloud.hdkitservice.model.ConnectResponse;
+import com.huaweicloud.hdkitservice.model.CredentialsResponse;
+import com.huaweicloud.hdkitservice.model.ReleaseResponse;
+import com.huaweicloud.hdkitservice.service.SandboxService;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+@WebMvcTest(SandboxController.class)
+class SandboxControllerTest {
+
+    @Autowired
+    private MockMvc mvc;
+
+    @MockBean
+    private SandboxService service;
+
+    @Test
+    void connectEndpoint() throws Exception {
+        when(service.connect(any(), eq("AK"), eq("SK")))
+                .thenReturn(new ConnectResponse("s1", "dev1", "100", "wss://x", "connected"));
+
+        mvc.perform(post("/rest/developer/server/hdkitservice/connect")
+                        .header("X-HW-AK", "AK").header("X-HW-SK", "SK")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"n1\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sessionId").value("s1"))
+                .andExpect(jsonPath("$.connectionAddress").value("wss://x"));
+    }
+
+    @Test
+    void connectMissingAkHeaderReturns400() throws Exception {
+        mvc.perform(post("/rest/developer/server/hdkitservice/connect")
+                        .header("X-HW-SK", "SK")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"n1\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("HDKIT_INVALID_REQUEST"));
+    }
+
+    @Test
+    void credentialsEndpoint() throws Exception {
+        when(service.credentials(any(), eq("AK"), eq("SK")))
+                .thenReturn(new CredentialsResponse("s1", "2026-08-14T04:39:54Z"));
+
+        mvc.perform(post("/rest/developer/server/hdkitservice/credentials")
+                        .header("X-HW-AK", "AK").header("X-HW-SK", "SK")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"dev_stage_id\":\"dev1\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.expiresAt").value("2026-08-14T04:39:54Z"));
+    }
+
+    @Test
+    void releaseEndpoint() throws Exception {
+        when(service.release(any(), eq("AK"), eq("SK")))
+                .thenReturn(new ReleaseResponse(true, "dev1"));
+
+        mvc.perform(post("/rest/developer/server/hdkitservice/release")
+                        .header("X-HW-AK", "AK").header("X-HW-SK", "SK")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"dev_stage_id\":\"dev1\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.released").value(true));
+    }
+
+    @Test
+    void hdkitExceptionMappedToHttpStatus() throws Exception {
+        when(service.credentials(any(), eq("AK"), eq("SK")))
+                .thenThrow(new SandboxService.HdkitException("HDKIT_NOT_RUNNING", "环境未处于 RUNNING", null));
+
+        mvc.perform(post("/rest/developer/server/hdkitservice/credentials")
+                        .header("X-HW-AK", "AK").header("X-HW-SK", "SK")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"dev_stage_id\":\"dev1\"}"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value("HDKIT_NOT_RUNNING"));
+    }
+}
