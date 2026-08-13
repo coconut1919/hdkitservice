@@ -20,6 +20,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -142,5 +143,24 @@ class SessionStoreTest {
         List<SandboxSession> result = store.listReleaseFailed();
         assertEquals(1, result.size());
         assertEquals("dev1", result.get(0).devStageId());
+    }
+
+    @Test
+    void listAllSkipsActiveSetAndReverseIndexKeys() {
+        when(redis.keys("hdkitservice:sandbox:*")).thenReturn(Set.of(
+                "hdkitservice:sandbox:active",
+                "hdkitservice:sandbox:by-devstage:dev1",
+                "hdkitservice:sandbox:s1"));
+        when(valueOps.get("hdkitservice:sandbox:s1")).thenReturn(
+                "{\"sessionId\":\"s1\",\"userKey\":\"uk\",\"name\":\"n1\",\"devStageId\":\"dev1\","
+                        + "\"connectionId\":\"1\",\"address\":\"wss://x\",\"status\":\"connected\","
+                        + "\"createdAt\":1,\"updatedAt\":2}");
+
+        List<SandboxSession> result = store.listAll();
+
+        assertEquals(1, result.size());
+        assertEquals("s1", result.get(0).sessionId());
+        verify(valueOps, never()).get("hdkitservice:sandbox:active");
+        verify(valueOps, never()).get("hdkitservice:sandbox:by-devstage:dev1");
     }
 }

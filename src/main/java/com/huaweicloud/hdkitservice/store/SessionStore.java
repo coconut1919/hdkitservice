@@ -81,10 +81,8 @@ public class SessionStore {
 
     public List<SandboxSession> listReleaseFailed() {
         List<SandboxSession> out = new ArrayList<>();
-        Set<String> keys = redis.keys(KEY_PREFIX + "*");
-        if (keys == null) return out;
-        for (String key : keys) {
-            SandboxSession s = get(key.substring(KEY_PREFIX.length()));
+        for (String id : sessionIds()) {
+            SandboxSession s = get(id);
             if (s != null && "release_failed".equals(s.status())) out.add(s);
         }
         return out;
@@ -92,13 +90,24 @@ public class SessionStore {
 
     public List<SandboxSession> listAll() {
         List<SandboxSession> out = new ArrayList<>();
-        Set<String> keys = redis.keys(KEY_PREFIX + "*");
-        if (keys == null) return out;
-        for (String key : keys) {
-            SandboxSession s = get(key.substring(KEY_PREFIX.length()));
+        for (String id : sessionIds()) {
+            SandboxSession s = get(id);
             if (s != null) out.add(s);
         }
         return out;
+    }
+
+    private List<String> sessionIds() {
+        Set<String> keys = redis.keys(KEY_PREFIX + "*");
+        if (keys == null) return List.of();
+        List<String> ids = new ArrayList<>();
+        for (String key : keys) {
+            if (key.equals(ACTIVE_SET) || key.startsWith(BY_DEVSTAGE_PREFIX)) {
+                continue;
+            }
+            ids.add(key.substring(KEY_PREFIX.length()));
+        }
+        return ids;
     }
 
     public void pruneActive() {
