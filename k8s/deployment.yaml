@@ -1,0 +1,96 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hdkitservice
+  namespace: huaweicloud-agent
+  labels:
+    app: hdkitservice
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hdkitservice
+  template:
+    metadata:
+      labels:
+        app: hdkitservice
+    spec:
+      imagePullSecrets:
+        - name: swr-secret
+      containers:
+        - name: server
+          image: swr.cn-south-1.myhuaweicloud.com/huaweicloud-agent/hdkitservice:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3001
+              protocol: TCP
+          env:
+            - name: PORT
+              value: "3001"
+            - name: REDIS_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: REDIS_HOST
+            - name: REDIS_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: REDIS_PORT
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: REDIS_PASSWORD
+            - name: MYSQL_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: MYSQL_HOST
+            - name: MYSQL_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: MYSQL_PORT
+            - name: MYSQL_USER
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: MYSQL_USER
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: MYSQL_PASSWORD
+            - name: MYSQL_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: MYSQL_DATABASE
+            - name: TEMPLATE_ID
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: TEMPLATE_ID
+            - name: FLAVOR_ID
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: FLAVOR_ID
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              cpu: 2
+              memory: 2Gi
+          readinessProbe:
+            tcpSocket:
+              port: 3001
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: 3001
+            initialDelaySeconds: 30
+            periodSeconds: 10
