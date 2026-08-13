@@ -28,8 +28,8 @@ import java.util.stream.Collectors;
 public class SandboxService {
 
     private static final Logger log = LoggerFactory.getLogger(SandboxService.class);
-    private static final String CDE_READY = "cde.0004";
-    private static final String CDE_RUNNING = "cde.0002";
+    private static final String STATUS_READY = "0004";
+    private static final String STATUS_RUNNING = "0002";
 
     private final DevStationClient devStation;
     private final SessionStore store;
@@ -68,7 +68,7 @@ public class SandboxService {
             name = "hcdk" + Long.toString(System.currentTimeMillis(), 36);
             devStageId = devStation.create(name, templateId, flavorId, req.source(), req.env(), req.git(), ak, sk);
             created = true;
-            waitForStatus(devStageId, CDE_READY, config.connectTimeout(), ak, sk);
+            waitForStatus(devStageId, STATUS_READY, config.connectTimeout(), ak, sk);
         }
 
         try {
@@ -116,9 +116,9 @@ public class SandboxService {
 
     private void ensureRunning(String devStageId, String ak, String sk) {
         String status = devStation.statusOf(devStageId, ak, sk);
-        if (!CDE_RUNNING.equals(status)) {
+        if (!isStatus(status, STATUS_RUNNING)) {
             devStation.start(devStageId, config.source(), ak, sk);
-            waitForStatus(devStageId, CDE_RUNNING, config.connectTimeout(), ak, sk);
+            waitForStatus(devStageId, STATUS_RUNNING, config.connectTimeout(), ak, sk);
         }
     }
 
@@ -141,7 +141,7 @@ public class SandboxService {
         }
 
         String status = devStation.statusOf(devStageId, ak, sk);
-        if (!CDE_RUNNING.equals(status)) {
+        if (!isStatus(status, STATUS_RUNNING)) {
             throw new HdkitException("HDKIT_NOT_RUNNING", "环境未处于 RUNNING，无法注入临时 AK/SK", null);
         }
 
@@ -193,7 +193,7 @@ public class SandboxService {
             return; // 幂等：环境已不存在，视为已释放
         }
         devStation.close(devStageId, config.source(), ak, sk);
-        waitForStatus(devStageId, CDE_READY, config.releaseTimeout(), ak, sk);
+        waitForStatus(devStageId, STATUS_READY, config.releaseTimeout(), ak, sk);
         devStation.delete(devStageId, config.source(), ak, sk);
         waitForGone(devStageId, config.releaseTimeout(), ak, sk);
     }
@@ -266,10 +266,16 @@ public class SandboxService {
         long deadline = System.currentTimeMillis() + timeoutMs;
         while (System.currentTimeMillis() < deadline) {
             String status = devStation.statusOf(devStageId, ak, sk);
-            if (target.equals(status)) return;
+            if (isStatus(status, target)) return;
             sleep(config.pollIntervalMs());
         }
         throw new HdkitException("HDKIT_TIMEOUT", "等待状态 " + target + " 超时", null);
+    }
+
+    private boolean isStatus(String actual, String code) {
+        if (actual == null) return false;
+        int dot = actual.lastIndexOf('.');
+        return (dot >= 0 ? actual.substring(dot + 1) : actual).equals(code);
     }
 
     private void waitForGone(String devStageId, long timeoutMs, String ak, String sk) {
