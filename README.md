@@ -5,7 +5,7 @@
 ## 技术栈
 
 - JDK 21 + Spring Boot 3.3 + Maven
-- Spring Web（RestClient）+ Spring Data Redis（Lettuce）
+- Spring Web（RestClient）
 - 华为云 SDK-HMAC-SHA256 签名（自实现，已用真实账号验证）
 
 ## 架构
@@ -19,17 +19,15 @@ hdkitservice (Spring Boot)
       │  DevStationClient（HTTP + SDK-HMAC-SHA256 签名）
       ▼
 DevStation 开放 API ──► 沙箱（云开发环境）
-      │
-Redis (DCS)：会话持久化 session → {name, devStageId, connectionId, address}
 ```
 
 ## 对外接口
 
-统一路径前缀 `/rest/developer/server/hdkitservice/`，仅 `GET`、`POST`。调用方通过请求头 `X-HW-AK` / `X-HW-SK` 传入华为云 AK/SK（沙箱归属调用方账号，AK/SK 不落日志、不进 Redis）。
+统一路径前缀 `/rest/developer/server/hdkitservice/`，仅 `GET`、`POST`。调用方通过请求头 `X-HW-AK` / `X-HW-SK` 传入华为云 AK/SK（沙箱归属调用方账号，AK/SK 不落日志、不做任何本地持久化）。
 
 ### 1. 连接沙箱（压缩）`POST /connect`
 
-**一用户一实例**：按调用方 AK 识别，先复用已有沙箱（开机 + 注入临时 AK/SK），没有才新建，返回新 wss 连接地址。
+**一用户一实例**：按调用方 AK 识别，先复用已有沙箱（开机 + 注入临时 AK/SK），没有才新建，返回新 wss 连接地址。`session_id` 与 `dev_stage_id` 等价（历史兼容字段）。
 
 ```bash
 curl -X POST http://<host>:<port>/rest/developer/server/hdkitservice/connect \
@@ -42,13 +40,15 @@ curl -X POST http://<host>:<port>/rest/developer/server/hdkitservice/connect \
 
 ```json
 {
-  "session_id": "sess_a1b2c3",
+  "session_id": "9a2263d6ef534879af7b51f166ff24b7",
   "dev_stage_id": "9a2263d6ef534879af7b51f166ff24b7",
   "connection_id": "373117",
   "connection_address": "wss://...?connect_code=...&ws_type=1&source=-2074327356",
   "status": "connected"
 }
 ```
+
+其中 `session_id` 的值等于 `dev_stage_id`。
 
 入参说明：`template_id`/`flavor_id`/`source`/`env`/`git` 均仅新建时生效（可选，默认取环境变量）；沙箱 `name` 由服务端自动生成。
 
@@ -66,7 +66,7 @@ curl -X POST http://<host>:<port>/rest/developer/server/hdkitservice/credentials
 响应：
 
 ```json
-{ "session_id": "sess_new_or_refreshed", "expires_at": "2026-08-14T04:39:54Z" }
+{ "session_id": "9a2263d6ef534879af7b51f166ff24b7", "expires_at": "2026-08-14T04:39:54Z" }
 ```
 
 ### 3. 释放沙箱 `POST /release`
@@ -86,7 +86,7 @@ curl -X POST http://<host>:<port>/rest/developer/server/hdkitservice/release \
 { "released": true, "dev_stage_id": "9a2263d6ef534879af7b51f166ff24b7" }
 ```
 
-`credentials` / `release` 的入参 `session_id` 与 `dev_stage_id` 二选一（`session_id` 优先）。
+`credentials` / `release` 的入参 `session_id` 是 `dev_stage_id` 的别名，二者等价。
 
 ### 错误响应
 
@@ -108,7 +108,7 @@ curl -X POST http://<host>:<port>/rest/developer/server/hdkitservice/release \
 
 ```bash
 # 需 JDK 21 + Maven
-mvn test       # 48 个单元测试
+mvn test       # 50 个单元测试
 mvn package    # 打包 target/hdkitservice-0.0.1.jar
 ```
 
@@ -117,8 +117,6 @@ mvn package    # 打包 target/hdkitservice-0.0.1.jar
 ```bash
 export TEMPLATE_ID=9891956fbad845f497e3c71c84910f5e   # 模板 uuid（GET /open-api-public/v1/templates）
 export FLAVOR_ID=23ebdfe3b2d34cc4b34a1aaf03d27c52    # 规格 flavor_id（GET /open-api-public/v1/specs）
-export REDIS_HOST=127.0.0.1
-export REDIS_PORT=6379
 export PORT=3002
 
 java -jar target/hdkitservice-0.0.1.jar
@@ -132,14 +130,11 @@ java -jar target/hdkitservice-0.0.1.jar
 | `DEVSTATION_SOURCE` | `CLI` | 操作 source 标识 |
 | `TEMPLATE_ID` | 空 | 沙箱模板 ID |
 | `FLAVOR_ID` | 空 | 沙箱规格 ID |
-| `REDIS_HOST` / `REDIS_PORT` / `REDIS_PASSWORD` | `127.0.0.1` / `6379` / 空 | 会话存储 |
 | `PORT` | `3001` | 服务端口 |
-| `SESSION_TTL` | `86400` | 会话 TTL（秒），与临时 AK/SK 24h 对齐 |
 | `POLL_INTERVAL_MS` | `5000` | 状态轮询间隔 |
 | `CONNECT_TIMEOUT` | `300000` | 连接编排超时 |
 | `RELEASE_TIMEOUT` | `180000` | 释放编排超时 |
-| `RECLAIM_INTERVAL` | `300000` | 后台清理过期会话间隔 |
-| `MAX_CONCURRENT` | `5` | 并发沙箱上限 |
+| `MAX_CONCURRENT` | `5` | 并发沙箱上限（按账号维度实时统计，含手动创建的环境） |
 
 ## 上游 DevStation API 映射
 
@@ -156,8 +151,7 @@ java -jar target/hdkitservice-0.0.1.jar
 ```
 src/main/java/com/huaweicloud/hdkitservice/
 ├── controller/        # REST 接口 + 全局异常处理
-├── service/           # 编排（SandboxService）、上游客户端（DevStationClient）、回收任务（ReclaimTask）
-├── store/             # Redis 会话存储
+├── service/           # 编排（SandboxService）、上游客户端（DevStationClient）
 ├── sign/              # SDK-HMAC-SHA256 签名
 ├── config/            # 环境变量配置
 └── model/             # DTO
