@@ -57,10 +57,12 @@ public class SandboxService {
             String name = "hcdk" + Long.toString(System.currentTimeMillis(), 36);
             devStageId = devStation.create(name, templateId, flavorId, req.source(), req.env(), req.git(), ak, sk);
             created = true;
-            waitForStatus(devStageId, STATUS_READY, config.connectTimeout(), ak, sk);
         }
 
         try {
+            if (created) {
+                waitForStatus(devStageId, STATUS_READY, config.connectTimeout(), ak, sk);
+            }
             ensureRunning(devStageId, ak, sk);
             devStation.autoConfig(devStageId, true, ak, sk); // 注入临时 AK/SK
 

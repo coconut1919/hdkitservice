@@ -71,7 +71,7 @@ curl -X POST http://<host>:<port>/rest/developer/server/hdkitservice/credentials
 
 ### 3. 释放沙箱 `POST /release`
 
-一次完成「关机 → 释放」，并清理会话（幂等，环境已不存在视为成功）。
+一次完成「关机 → 释放」（幂等，环境已不存在视为成功）。
 
 ```bash
 curl -X POST http://<host>:<port>/rest/developer/server/hdkitservice/release \
@@ -97,10 +97,11 @@ curl -X POST http://<host>:<port>/rest/developer/server/hdkitservice/release \
 | HTTP | 业务码 | 说明 |
 |------|--------|------|
 | 400 | `HDKIT_INVALID_REQUEST` | 参数缺失/非法 |
+| 404 | `HDKIT_SANDBOX_NOT_FOUND` | 环境不存在或已被删除 |
 | 409 | `HDKIT_CONFLICT` | 并发冲突/已存在 |
 | 422 | `HDKIT_NOT_RUNNING` | 环境未处于 RUNNING，无法注入 AK/SK |
 | 502 | `HDKIT_UPSTREAM_ERROR` / `HDKIT_CONNECT_FAILED` / `HDKIT_RELEASE_FAILED` | 上游/编排失败 |
-| 504 | `HDKIT_CONNECT_TIMEOUT` / `HDKIT_RELEASE_TIMEOUT` | 编排超时 |
+| 504 | `HDKIT_TIMEOUT` / `HDKIT_RELEASE_TIMEOUT` | 编排超时 |
 
 ## 快速开始
 
