@@ -6,7 +6,7 @@
 
 - 已登录 SWR（`hcloud SWR CreateSecret --cli-region=cn-south-1` 可获取临时登录凭证）
 - 具备 prod 集群 kubectl 访问权限（CCE 控制台下载 kubeconfig）
-- 镜像已推送：`swr.cn-south-1.myhuaweicloud.com/huaweicloud-agent/hdkitservice:20260813154341945`
+- 镜像已推送：`swr.cn-south-1.myhuaweicloud.com/huaweicloud-devkit-prod/hdkitservice:20260813154341945`
 
 ## 步骤 1：更新镜像拉取凭证
 

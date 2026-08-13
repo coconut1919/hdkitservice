@@ -19,7 +19,7 @@ spec:
         - name: swr-secret
       containers:
         - name: server
-          image: swr.cn-south-1.myhuaweicloud.com/huaweicloud-agent/hdkitservice:20260813154341945
+          image: swr.cn-south-1.myhuaweicloud.com/huaweicloud-devkit-prod/hdkitservice:20260813154341945
           imagePullPolicy: Always
           ports:
             - containerPort: 3001
