@@ -157,4 +157,51 @@ class DevStationClientTest {
         assertTrue(ex.getMessage().contains("HD.98320045"));
         server.verify();
     }
+
+    @Test
+    void realNameStatusParsesObjectResult() {
+        server.expect(requestTo("https://devstation.myhuaweicloud.com/open-api-public/v1/realnames"))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess(
+                        "{\"result\":{\"realname_status\":\"2\"},\"error_msg\":\"success\",\"error_code\":\"0000\"}",
+                        MediaType.APPLICATION_JSON));
+
+        assertEquals("2", client.realNameStatus("TESTAK", "TESTSK"));
+        server.verify();
+    }
+
+    @Test
+    void agreementsParsesList() {
+        server.expect(requestTo("https://devstation.myhuaweicloud.com/open-api-public/v1/agreements"))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess(
+                        "{\"result\":[{\"agr_type\":\"90102\",\"country\":\"cn\",\"language\":\"zh_cn\","
+                                + "\"sign_status\":3,\"version\":2025062315},"
+                                + "{\"agr_type\":\"90142\",\"country\":\"cn\",\"language\":\"zh_cn\","
+                                + "\"sign_status\":1,\"version\":2026060305}],"
+                                + "\"error_msg\":\"success\",\"error_code\":\"0000\"}",
+                        MediaType.APPLICATION_JSON));
+
+        List<DevStationClient.Agreement> list = client.agreements("TESTAK", "TESTSK");
+        assertEquals(2, list.size());
+        assertEquals("90102", list.get(0).agrType());
+        assertEquals(3, list.get(0).signStatus());
+        assertEquals(2025062315L, list.get(0).version());
+        server.verify();
+    }
+
+    @Test
+    void signAgreementsPostsSignInfoList() {
+        server.expect(requestTo("https://devstation.myhuaweicloud.com/open-api-public/v1/agreements"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(content().json("{\"sign_info_list\":["
+                        + "{\"agr_type\":\"90102\",\"country\":\"cn\",\"language\":\"zh_cn\",\"version\":2025062315}]}"))
+                .andRespond(withSuccess(
+                        "{\"result\":true,\"error_msg\":\"success\",\"error_code\":\"0000\"}",
+                        MediaType.APPLICATION_JSON));
+
+        client.signAgreements(
+                List.of(new DevStationClient.SignReq("90102", "cn", "zh_cn", 2025062315L)), "TESTAK", "TESTSK");
+        server.verify();
+    }
 }

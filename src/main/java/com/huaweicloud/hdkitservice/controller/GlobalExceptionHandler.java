@@ -17,16 +17,18 @@ import java.util.UUID;
 public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
-    private static final Map<String, HttpStatus> STATUS_MAP = Map.of(
-            "HDKIT_INVALID_REQUEST", HttpStatus.BAD_REQUEST,
-            "HDKIT_NOT_RUNNING", HttpStatus.UNPROCESSABLE_ENTITY,
-            "HDKIT_CONFLICT", HttpStatus.CONFLICT,
-            "HDKIT_SANDBOX_NOT_FOUND", HttpStatus.NOT_FOUND,
-            "HDKIT_TIMEOUT", HttpStatus.GATEWAY_TIMEOUT,
-            "HDKIT_RELEASE_TIMEOUT", HttpStatus.GATEWAY_TIMEOUT,
-            "HDKIT_UPSTREAM_ERROR", HttpStatus.BAD_GATEWAY,
-            "HDKIT_CONNECT_FAILED", HttpStatus.BAD_GATEWAY,
-            "HDKIT_RELEASE_FAILED", HttpStatus.BAD_GATEWAY);
+    private static final Map<String, HttpStatus> STATUS_MAP = Map.ofEntries(
+            Map.entry("HDKIT_INVALID_REQUEST", HttpStatus.BAD_REQUEST),
+            Map.entry("HDKIT_NOT_RUNNING", HttpStatus.UNPROCESSABLE_ENTITY),
+            Map.entry("HDKIT_CONFLICT", HttpStatus.CONFLICT),
+            Map.entry("HDKIT_NOT_REALNAME", HttpStatus.FORBIDDEN),
+            Map.entry("HDKIT_NOT_AGREEMENT", HttpStatus.FORBIDDEN),
+            Map.entry("HDKIT_SANDBOX_NOT_FOUND", HttpStatus.NOT_FOUND),
+            Map.entry("HDKIT_TIMEOUT", HttpStatus.GATEWAY_TIMEOUT),
+            Map.entry("HDKIT_RELEASE_TIMEOUT", HttpStatus.GATEWAY_TIMEOUT),
+            Map.entry("HDKIT_UPSTREAM_ERROR", HttpStatus.BAD_GATEWAY),
+            Map.entry("HDKIT_CONNECT_FAILED", HttpStatus.BAD_GATEWAY),
+            Map.entry("HDKIT_RELEASE_FAILED", HttpStatus.BAD_GATEWAY));
 
     @ExceptionHandler(SandboxService.HdkitException.class)
     public ResponseEntity<ErrorResponse> handle(SandboxService.HdkitException e) {

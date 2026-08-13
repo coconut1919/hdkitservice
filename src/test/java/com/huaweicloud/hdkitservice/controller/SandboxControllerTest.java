@@ -1,8 +1,10 @@
 package com.huaweicloud.hdkitservice.controller;
 
+import com.huaweicloud.hdkitservice.model.CheckUserResponse;
 import com.huaweicloud.hdkitservice.model.ConnectResponse;
 import com.huaweicloud.hdkitservice.model.CredentialsResponse;
 import com.huaweicloud.hdkitservice.model.ReleaseResponse;
+import com.huaweicloud.hdkitservice.model.SignAgreementResponse;
 import com.huaweicloud.hdkitservice.service.SandboxService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,6 +16,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -88,5 +91,40 @@ class SandboxControllerTest {
                         .content("{\"dev_stage_id\":\"dev1\"}"))
                 .andExpect(status().isUnprocessableEntity())
                 .andExpect(jsonPath("$.code").value("HDKIT_NOT_RUNNING"));
+    }
+
+    @Test
+    void checkUserEndpoint() throws Exception {
+        when(service.checkUser(eq("AK"), eq("SK")))
+                .thenReturn(new CheckUserResponse(true, true));
+
+        mvc.perform(get("/rest/developer/server/hdkitservice/check-user")
+                        .header("X-HW-AK", "AK").header("X-HW-SK", "SK"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.realnameVerified").value(true))
+                .andExpect(jsonPath("$.agreementSigned").value(true));
+    }
+
+    @Test
+    void checkUserNotRealnameMappedTo403() throws Exception {
+        when(service.checkUser(eq("AK"), eq("SK")))
+                .thenThrow(new SandboxService.HdkitException("HDKIT_NOT_REALNAME", "用户未完成实名认证", null));
+
+        mvc.perform(get("/rest/developer/server/hdkitservice/check-user")
+                        .header("X-HW-AK", "AK").header("X-HW-SK", "SK"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("HDKIT_NOT_REALNAME"));
+    }
+
+    @Test
+    void signAgreementEndpoint() throws Exception {
+        when(service.signAgreement(eq("AK"), eq("SK")))
+                .thenReturn(new SignAgreementResponse(true, 3));
+
+        mvc.perform(post("/rest/developer/server/hdkitservice/sign-agreement")
+                        .header("X-HW-AK", "AK").header("X-HW-SK", "SK"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.signed").value(true))
+                .andExpect(jsonPath("$.signedCount").value(3));
     }
 }

@@ -145,10 +145,48 @@ public class DevStationClient {
         return r.path("result").path("sts_expires_at").asText();
     }
 
+    public String realNameStatus(String ak, String sk) {
+        JsonNode r = call("GET", "/open-api-public/v1/realnames", "", "", ak, sk);
+        JsonNode result = r.path("result");
+        if (result.isArray() && result.size() > 0) {
+            return result.get(0).path("realname_status").asText();
+        }
+        return result.path("realname_status").asText();
+    }
+
+    public List<Agreement> agreements(String ak, String sk) {
+        JsonNode r = call("GET", "/open-api-public/v1/agreements", "", "", ak, sk);
+        List<Agreement> out = new ArrayList<>();
+        for (JsonNode item : r.path("result")) {
+            out.add(new Agreement(
+                    item.path("agr_type").asText(),
+                    item.path("country").asText("cn"),
+                    item.path("language").asText("zh_cn"),
+                    item.path("sign_status").asInt(-1),
+                    item.path("version").asLong(0)));
+        }
+        return out;
+    }
+
+    public void signAgreements(List<SignReq> list, String ak, String sk) {
+        var root = mapper.createObjectNode();
+        var arr = root.putArray("sign_info_list");
+        for (SignReq s : list) {
+            var o = arr.addObject();
+            o.put("agr_type", s.agrType());
+            o.put("country", s.country());
+            o.put("language", s.language());
+            o.put("version", s.version());
+        }
+        call("POST", "/open-api-public/v1/agreements", "", root.toString(), ak, sk);
+    }
+
     public record Devenv(String id, String name, String status) {}
     public record Conn(long connectionId, String status) {}
     public record Connections(long connectionId, List<Conn> list) {}
     public record ConnectionAddress(String url, String source) {}
+    public record Agreement(String agrType, String country, String language, int signStatus, long version) {}
+    public record SignReq(String agrType, String country, String language, long version) {}
 
     public static class DevStationException extends RuntimeException {
         public DevStationException(String message, Throwable cause) { super(message, cause); }

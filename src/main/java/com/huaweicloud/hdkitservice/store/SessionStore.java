@@ -20,6 +20,7 @@ public class SessionStore {
     private static final String KEY_PREFIX = "hdkitservice:sandbox:";
     private static final String BY_DEVSTAGE_PREFIX = "hdkitservice:sandbox:by-devstage:";
     private static final String ACTIVE_SET = "hdkitservice:sandbox:active";
+    private static final String USER_KEY_PREFIX = "hdkitservice:user:";
 
     private final StringRedisTemplate redis;
     private final ObjectMapper mapper;
@@ -97,5 +98,23 @@ public class SessionStore {
                 redis.opsForSet().remove(ACTIVE_SET, sid);
             }
         }
+    }
+
+    public boolean isRealnameVerified(String userKey) {
+        return "ok".equals(redis.opsForValue().get(USER_KEY_PREFIX + userKey + ":realname"));
+    }
+
+    public void cacheRealnameVerified(String userKey) {
+        redis.opsForValue().set(USER_KEY_PREFIX + userKey + ":realname", "ok",
+                Duration.ofSeconds(config.sessionTtl()));
+    }
+
+    public boolean isAgreementSigned(String userKey) {
+        return "ok".equals(redis.opsForValue().get(USER_KEY_PREFIX + userKey + ":agreement"));
+    }
+
+    public void cacheAgreementSigned(String userKey) {
+        redis.opsForValue().set(USER_KEY_PREFIX + userKey + ":agreement", "ok",
+                Duration.ofSeconds(config.sessionTtl()));
     }
 }

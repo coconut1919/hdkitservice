@@ -1,6 +1,7 @@
 package com.huaweicloud.hdkitservice.service;
 
 import com.huaweicloud.hdkitservice.config.HdkitConfig;
+import com.huaweicloud.hdkitservice.model.CheckUserResponse;
 import com.huaweicloud.hdkitservice.model.ConnectRequest;
 import com.huaweicloud.hdkitservice.model.ConnectResponse;
 import com.huaweicloud.hdkitservice.model.CredentialsRequest;
@@ -8,12 +9,18 @@ import com.huaweicloud.hdkitservice.model.CredentialsResponse;
 import com.huaweicloud.hdkitservice.model.ReleaseRequest;
 import com.huaweicloud.hdkitservice.model.ReleaseResponse;
 import com.huaweicloud.hdkitservice.model.SandboxSession;
+import com.huaweicloud.hdkitservice.model.SignAgreementResponse;
+import com.huaweicloud.hdkitservice.sign.Signer;
 import com.huaweicloud.hdkitservice.store.SessionStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 
 @Service
 public class SandboxService {
@@ -170,6 +177,63 @@ public class SandboxService {
         waitForStatus(devStageId, CDE_READY, config.releaseTimeout(), ak, sk);
         devStation.delete(devStageId, config.source(), ak, sk);
         waitForGone(devStageId, config.releaseTimeout(), ak, sk);
+    }
+
+    public CheckUserResponse checkUser(String ak, String sk) {
+        String userKey = Signer.sha256Hex(ak);
+        boolean realnameCached = store.isRealnameVerified(userKey);
+        boolean agreementCached = store.isAgreementSigned(userKey);
+
+        CompletableFuture<Boolean> realnameFuture = CompletableFuture.supplyAsync(
+                () -> realnameCached || "2".equals(devStation.realNameStatus(ak, sk)));
+        CompletableFuture<Boolean> agreementFuture = CompletableFuture.supplyAsync(
+                () -> agreementCached || allAgreementsSigned(devStation.agreements(ak, sk)));
+
+        boolean realnameOk = await(realnameFuture, "查询实名状态失败");
+        boolean agreementOk = await(agreementFuture, "查询协议状态失败");
+
+        if (realnameOk && !realnameCached) store.cacheRealnameVerified(userKey);
+        if (agreementOk && !agreementCached) store.cacheAgreementSigned(userKey);
+
+        if (!realnameOk) throw new HdkitException("HDKIT_NOT_REALNAME", "用户未完成实名认证", null);
+        if (!agreementOk) throw new HdkitException("HDKIT_NOT_AGREEMENT", "用户未签署协议", null);
+        return new CheckUserResponse(true, true);
+    }
+
+    public SignAgreementResponse signAgreement(String ak, String sk) {
+        String userKey = Signer.sha256Hex(ak);
+        List<DevStationClient.Agreement> agreements = devStation.agreements(ak, sk);
+        List<DevStationClient.SignReq> toSign = new ArrayList<>();
+        for (DevStationClient.Agreement a : agreements) {
+            if (a.signStatus() == 2 || a.signStatus() == 3) {
+                toSign.add(new DevStationClient.SignReq(a.agrType(), a.country(), a.language(), a.version()));
+            }
+        }
+        if (!toSign.isEmpty()) {
+            devStation.signAgreements(toSign, ak, sk);
+        }
+        store.cacheAgreementSigned(userKey);
+        return new SignAgreementResponse(true, toSign.size());
+    }
+
+    private boolean allAgreementsSigned(List<DevStationClient.Agreement> agreements) {
+        if (agreements.isEmpty()) return false;
+        for (DevStationClient.Agreement a : agreements) {
+            if (a.signStatus() != 1 && a.signStatus() != 2) return false;
+        }
+        return true;
+    }
+
+    private boolean await(CompletableFuture<Boolean> f, String errMsg) {
+        try {
+            return f.join();
+        } catch (CompletionException e) {
+            Throwable c = e.getCause();
+            if (c instanceof DevStationClient.DevStationException) {
+                throw new HdkitException("HDKIT_UPSTREAM_ERROR", errMsg, c);
+            }
+            throw new HdkitException("HDKIT_INTERNAL", errMsg, c);
+        }
     }
 
     private long pickConnected(DevStationClient.Connections conns) {

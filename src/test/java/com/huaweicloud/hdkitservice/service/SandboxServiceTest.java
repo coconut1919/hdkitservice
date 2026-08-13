@@ -1,6 +1,7 @@
 package com.huaweicloud.hdkitservice.service;
 
 import com.huaweicloud.hdkitservice.config.HdkitConfig;
+import com.huaweicloud.hdkitservice.model.CheckUserResponse;
 import com.huaweicloud.hdkitservice.model.ConnectRequest;
 import com.huaweicloud.hdkitservice.model.ConnectResponse;
 import com.huaweicloud.hdkitservice.model.CredentialsRequest;
@@ -8,6 +9,7 @@ import com.huaweicloud.hdkitservice.model.CredentialsResponse;
 import com.huaweicloud.hdkitservice.model.ReleaseRequest;
 import com.huaweicloud.hdkitservice.model.ReleaseResponse;
 import com.huaweicloud.hdkitservice.model.SandboxSession;
+import com.huaweicloud.hdkitservice.model.SignAgreementResponse;
 import com.huaweicloud.hdkitservice.store.SessionStore;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -293,5 +295,79 @@ class SandboxServiceTest {
         SandboxService.HdkitException ex = assertThrows(SandboxService.HdkitException.class,
                 () -> service.release(new ReleaseRequest(null, null), "AK", "SK"));
         assertEquals("HDKIT_INVALID_REQUEST", ex.code());
+    }
+
+    // ── check-user / sign-agreement ──
+
+    @Test
+    void checkUserHappyPathCaches() {
+        when(store.isRealnameVerified(anyString())).thenReturn(false);
+        when(store.isAgreementSigned(anyString())).thenReturn(false);
+        when(devStation.realNameStatus("AK", "SK")).thenReturn("2");
+        when(devStation.agreements("AK", "SK"))
+                .thenReturn(List.of(new DevStationClient.Agreement("90102", "cn", "zh_cn", 1, 2025062315L)));
+
+        CheckUserResponse resp = service.checkUser("AK", "SK");
+
+        assertTrue(resp.realnameVerified());
+        assertTrue(resp.agreementSigned());
+        verify(store).cacheRealnameVerified(anyString());
+        verify(store).cacheAgreementSigned(anyString());
+    }
+
+    @Test
+    void checkUserNotRealnameThrowsAndNoCache() {
+        when(store.isRealnameVerified(anyString())).thenReturn(false);
+        when(store.isAgreementSigned(anyString())).thenReturn(false);
+        when(devStation.realNameStatus("AK", "SK")).thenReturn("0");
+        when(devStation.agreements("AK", "SK"))
+                .thenReturn(List.of(new DevStationClient.Agreement("90102", "cn", "zh_cn", 1, 2025062315L)));
+
+        SandboxService.HdkitException ex = assertThrows(SandboxService.HdkitException.class,
+                () -> service.checkUser("AK", "SK"));
+        assertEquals("HDKIT_NOT_REALNAME", ex.code());
+        verify(store, never()).cacheRealnameVerified(anyString());
+    }
+
+    @Test
+    void checkUserNotAgreementThrowsAndNoCache() {
+        when(store.isRealnameVerified(anyString())).thenReturn(false);
+        when(store.isAgreementSigned(anyString())).thenReturn(false);
+        when(devStation.realNameStatus("AK", "SK")).thenReturn("2");
+        when(devStation.agreements("AK", "SK"))
+                .thenReturn(List.of(new DevStationClient.Agreement("90102", "cn", "zh_cn", 3, 2025062315L)));
+
+        SandboxService.HdkitException ex = assertThrows(SandboxService.HdkitException.class,
+                () -> service.checkUser("AK", "SK"));
+        assertEquals("HDKIT_NOT_AGREEMENT", ex.code());
+        verify(store, never()).cacheAgreementSigned(anyString());
+    }
+
+    @Test
+    void checkUserUsesCachedStatusSkipsUpstream() {
+        when(store.isRealnameVerified(anyString())).thenReturn(true);
+        when(store.isAgreementSigned(anyString())).thenReturn(true);
+
+        CheckUserResponse resp = service.checkUser("AK", "SK");
+
+        assertTrue(resp.realnameVerified());
+        assertTrue(resp.agreementSigned());
+        verify(devStation, never()).realNameStatus(any(), any());
+        verify(devStation, never()).agreements(any(), any());
+    }
+
+    @Test
+    void signAgreementSignsOnlyUnsignedAndCaches() {
+        when(devStation.agreements("AK", "SK")).thenReturn(List.of(
+                new DevStationClient.Agreement("90102", "cn", "zh_cn", 3, 2025062315L),
+                new DevStationClient.Agreement("90142", "cn", "zh_cn", 1, 2026060305L)));
+
+        SignAgreementResponse resp = service.signAgreement("AK", "SK");
+
+        assertTrue(resp.signed());
+        assertEquals(1, resp.signedCount());
+        verify(devStation).signAgreements(argThat(l -> l.size() == 1
+                && "90102".equals(l.get(0).agrType())), eq("AK"), eq("SK"));
+        verify(store).cacheAgreementSigned(anyString());
     }
 }
