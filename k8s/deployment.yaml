@@ -27,21 +27,6 @@ spec:
           env:
             - name: PORT
               value: "3001"
-            - name: REDIS_HOST
-              valueFrom:
-                secretKeyRef:
-                  name: app-secrets
-                  key: REDIS_HOST
-            - name: REDIS_PORT
-              valueFrom:
-                secretKeyRef:
-                  name: app-secrets
-                  key: REDIS_PORT
-            - name: REDIS_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: app-secrets
-                  key: REDIS_PASSWORD
             - name: MYSQL_HOST
               valueFrom:
                 secretKeyRef:

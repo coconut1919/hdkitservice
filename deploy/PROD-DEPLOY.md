@@ -29,9 +29,6 @@ kubectl create secret docker-registry swr-secret -n backend \
 
 ```bash
 kubectl create secret generic app-secrets -n backend \
-  --from-literal=REDIS_HOST=<prod Redis 地址> \
-  --from-literal=REDIS_PORT=6379 \
-  --from-literal=REDIS_PASSWORD=<prod Redis 密码> \
   --from-literal=MYSQL_HOST=<prod MySQL 地址> \
   --from-literal=MYSQL_PORT=3306 \
   --from-literal=MYSQL_USER=<prod MySQL 用户> \
@@ -78,5 +75,4 @@ curl -H "X-HW-AK: <AK>" -H "X-HW-SK: <SK>" \
 |------|------|
 | ErrImagePull / 401 | swr-secret 过期，重跑步骤 1 |
 | Pending (Insufficient cpu) | 清理遗留 Pod 释放资源 |
-| Redis 连接超时 | 确认 REDIS_HOST 在 prod VPC 内可达 |
 | MySQL 连接失败 | 确认 MYSQL_* 值正确、RDS 安全组放行 3306 |
