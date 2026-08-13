@@ -18,9 +18,11 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
+import java.util.stream.Collectors;
 
 @Service
 public class SandboxService {
@@ -40,12 +42,16 @@ public class SandboxService {
     }
 
     public ConnectResponse connect(ConnectRequest req, String ak, String sk) {
+        String userKey = Signer.sha256Hex(ak);
         String templateId = (req.templateId() == null || req.templateId().isEmpty())
                 ? config.templateId() : req.templateId();
         String flavorId = (req.flavorId() == null || req.flavorId().isEmpty())
                 ? config.flavorId() : req.flavorId();
 
-        DevStationClient.Devenv existing = findExistingInstance(ak, sk);
+        List<DevStationClient.Devenv> actual = devStation.list("", ak, sk);
+        reconcileStaleSessions(userKey, actual);
+
+        DevStationClient.Devenv existing = findHcdkInstance(actual);
         String devStageId;
         String name;
         boolean created = false;
@@ -74,7 +80,7 @@ public class SandboxService {
             DevStationClient.ConnectionAddress addr = devStation.address(devStageId, connectionId, ak, sk);
             String address = addr.url() + "&source=" + addr.source();
 
-            String sessionId = upsertSession(devStageId, name, String.valueOf(connectionId), address);
+            String sessionId = upsertSession(userKey, devStageId, name, String.valueOf(connectionId), address);
             return new ConnectResponse(sessionId, devStageId, String.valueOf(connectionId), address, "connected");
         } catch (Exception e) {
             log.error("[connect] failed: {}", e.getMessage());
@@ -87,13 +93,25 @@ public class SandboxService {
         }
     }
 
-    private DevStationClient.Devenv findExistingInstance(String ak, String sk) {
-        for (DevStationClient.Devenv d : devStation.list("", ak, sk)) {
+    private DevStationClient.Devenv findHcdkInstance(List<DevStationClient.Devenv> actual) {
+        for (DevStationClient.Devenv d : actual) {
             if (d.name() != null && d.name().startsWith("hcdk")) {
                 return d;
             }
         }
         return null;
+    }
+
+    private void reconcileStaleSessions(String userKey, List<DevStationClient.Devenv> actual) {
+        Set<String> actualIds = actual.stream()
+                .map(DevStationClient.Devenv::id)
+                .collect(Collectors.toSet());
+        for (SandboxSession s : store.listAll()) {
+            if (userKey.equals(s.userKey()) && !actualIds.contains(s.devStageId())) {
+                log.info("[connect] prune stale session {} (dev env {} gone)", s.sessionId(), s.devStageId());
+                store.delete(s.sessionId());
+            }
+        }
     }
 
     private void ensureRunning(String devStageId, String ak, String sk) {
@@ -104,18 +122,19 @@ public class SandboxService {
         }
     }
 
-    private String upsertSession(String devStageId, String name, String connectionId, String address) {
+    private String upsertSession(String userKey, String devStageId, String name, String connectionId, String address) {
         String existing = store.findByDevStageId(devStageId);
         String sessionId = (existing != null && !existing.isEmpty())
                 ? existing
                 : UUID.randomUUID().toString().replace("-", "").substring(0, 16);
         long now = System.currentTimeMillis();
-        store.save(new SandboxSession(sessionId, name, devStageId, connectionId, address, "connected", now, now));
+        store.save(new SandboxSession(sessionId, userKey, name, devStageId, connectionId, address, "connected", now, now));
         store.addActive(sessionId);
         return sessionId;
     }
 
     public CredentialsResponse credentials(CredentialsRequest req, String ak, String sk) {
+        String userKey = Signer.sha256Hex(ak);
         String devStageId = resolveDevStageId(req.sessionId(), req.devStageId());
         if (devStageId == null) {
             throw new HdkitException("HDKIT_INVALID_REQUEST", "缺少 session_id 或 dev_stage_id", null);
@@ -135,12 +154,12 @@ public class SandboxService {
         if (existing != null) {
             SandboxSession old = store.get(existing);
             sessionId = existing;
-            store.save(new SandboxSession(sessionId, old != null ? old.name() : "", devStageId,
+            store.save(new SandboxSession(sessionId, userKey, old != null ? old.name() : "", devStageId,
                     old != null ? old.connectionId() : "", old != null ? old.address() : "",
                     old != null ? old.status() : "connected", old != null ? old.createdAt() : now, now));
         } else {
             sessionId = UUID.randomUUID().toString().replace("-", "").substring(0, 16);
-            store.save(new SandboxSession(sessionId, "", devStageId, "", "", "connected", now, now));
+            store.save(new SandboxSession(sessionId, userKey, "", devStageId, "", "", "connected", now, now));
         }
         return new CredentialsResponse(sessionId, expiresAt);
     }
@@ -161,7 +180,7 @@ public class SandboxService {
             if (sid != null) {
                 SandboxSession old = store.get(sid);
                 if (old != null) {
-                    store.save(new SandboxSession(sid, old.name(), devStageId, old.connectionId(),
+                    store.save(new SandboxSession(sid, old.userKey(), old.name(), devStageId, old.connectionId(),
                             old.address(), "release_failed", old.createdAt(), System.currentTimeMillis()));
                 }
             }

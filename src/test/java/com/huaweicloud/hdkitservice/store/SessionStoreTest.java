@@ -47,7 +47,7 @@ class SessionStoreTest {
 
     @Test
     void saveWritesSessionAndReverseIndex() {
-        SandboxSession s = new SandboxSession("s1", "hcdk1", "dev1", "1", "wss://x", "connected", 1L, 2L);
+        SandboxSession s = new SandboxSession("s1", "uk1", "hcdk1", "dev1", "1", "wss://x", "connected", 1L, 2L);
         store.save(s);
 
         verify(valueOps).set(eq("hdkitservice:sandbox:s1"), anyString(), any(Duration.class));
@@ -56,7 +56,7 @@ class SessionStoreTest {
 
     @Test
     void getReturnsParsedSession() throws Exception {
-        SandboxSession s = new SandboxSession("s1", "hcdk1", "dev1", "1", "wss://x", "connected", 1L, 2L);
+        SandboxSession s = new SandboxSession("s1", "uk1", "hcdk1", "dev1", "1", "wss://x", "connected", 1L, 2L);
         when(valueOps.get("hdkitservice:sandbox:s1")).thenReturn(mapper.writeValueAsString(s));
 
         SandboxSession got = store.get("s1");

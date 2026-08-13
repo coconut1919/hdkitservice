@@ -10,6 +10,7 @@ import com.huaweicloud.hdkitservice.model.ReleaseRequest;
 import com.huaweicloud.hdkitservice.model.ReleaseResponse;
 import com.huaweicloud.hdkitservice.model.SandboxSession;
 import com.huaweicloud.hdkitservice.model.SignAgreementResponse;
+import com.huaweicloud.hdkitservice.sign.Signer;
 import com.huaweicloud.hdkitservice.store.SessionStore;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -202,6 +203,61 @@ class SandboxServiceTest {
         verify(devStation, never()).delete(any(), any(), any(), any());
     }
 
+    @Test
+    void connectReconcilesStaleSessionsOfCurrentUser() {
+        String uk = Signer.sha256Hex("AK");
+        when(devStation.list("", "AK", "SK"))
+                .thenReturn(List.of(new DevStationClient.Devenv("dev1", "hcdkabc", "cde.0002")));
+        when(store.listAll()).thenReturn(List.of(
+                new SandboxSession("s2", uk, "hcdkold", "dev2", "2", "wss://old", "connected", 1L, 2L),
+                new SandboxSession("s1", uk, "hcdkabc", "dev1", "1", "wss://x", "connected", 1L, 2L),
+                new SandboxSession("s3", "otherUserKey", "hcdk3", "dev3", "3", "wss://3", "connected", 1L, 2L)));
+        when(devStation.statusOf("dev1", "AK", "SK")).thenReturn("cde.0002");
+        when(devStation.connections("dev1", "CLI", "AK", "SK"))
+                .thenReturn(new DevStationClient.Connections(200L,
+                        List.of(new DevStationClient.Conn(200L, "CONNECTED"))));
+        when(devStation.address("dev1", 200L, "AK", "SK"))
+                .thenReturn(new DevStationClient.ConnectionAddress("wss://example/reuse", "-1"));
+
+        service.connect(new ConnectRequest(null, null, null, null, Map.of(), Map.of()), "AK", "SK");
+
+        verify(store).delete("s2");                 // 同用户、云上已删除 → 清理
+        verify(store, never()).delete("s1");        // 云上仍存在 → 保留
+        verify(store, never()).delete("s3");        // 其他用户 → 不碰
+    }
+
+    @Test
+    void connectReconcileThenConcurrencyCheckUsesCleanedState() {
+        String uk = Signer.sha256Hex("AK");
+        // 云上无 hcdk 实例，但 Redis 有 5 个陈旧会话（同用户）
+        when(devStation.list("", "AK", "SK")).thenReturn(List.of());
+        when(store.listAll()).thenReturn(List.of(
+                new SandboxSession("s1", uk, "hcdk1", "d1", "1", "wss://1", "connected", 1L, 2L),
+                new SandboxSession("s2", uk, "hcdk2", "d2", "2", "wss://2", "connected", 1L, 2L),
+                new SandboxSession("s3", uk, "hcdk3", "d3", "3", "wss://3", "connected", 1L, 2L),
+                new SandboxSession("s4", uk, "hcdk4", "d4", "4", "wss://4", "connected", 1L, 2L),
+                new SandboxSession("s5", uk, "hcdk5", "d5", "5", "wss://5", "connected", 1L, 2L)));
+        when(store.countActive()).thenReturn(0L);
+        when(devStation.create(any(), any(), any(), any(), any(), any(), eq("AK"), eq("SK"))).thenReturn("dev1");
+        when(devStation.statusOf("dev1", "AK", "SK")).thenReturn("cde.0004", "cde.0004", "cde.0002");
+        when(devStation.connections("dev1", "CLI", "AK", "SK"))
+                .thenReturn(new DevStationClient.Connections(100L,
+                        List.of(new DevStationClient.Conn(100L, "CONNECTED"))));
+        when(devStation.address("dev1", 100L, "AK", "SK"))
+                .thenReturn(new DevStationClient.ConnectionAddress("wss://x", "-1"));
+
+        ConnectResponse resp = service.connect(
+                new ConnectRequest(null, null, null, null, Map.of(), Map.of()), "AK", "SK");
+
+        assertEquals("dev1", resp.devStageId());
+        // 5 个陈旧会话全部被清理
+        verify(store).delete("s1");
+        verify(store).delete("s2");
+        verify(store).delete("s3");
+        verify(store).delete("s4");
+        verify(store).delete("s5");
+    }
+
     // ── credentials ──
 
     @Test
@@ -219,7 +275,7 @@ class SandboxServiceTest {
 
     @Test
     void credentialsResolvesDevStageIdFromSession() {
-        SandboxSession s = new SandboxSession("s1", "n1", "dev1", "1", "wss://x", "connected", 1L, 2L);
+        SandboxSession s = new SandboxSession("s1", "uk1", "n1", "dev1", "1", "wss://x", "connected", 1L, 2L);
         when(store.get("s1")).thenReturn(s);
         when(store.findByDevStageId("dev1")).thenReturn("s1");
         when(devStation.statusOf("dev1", "AK", "SK")).thenReturn("cde.0002");
@@ -282,7 +338,7 @@ class SandboxServiceTest {
         doThrow(new DevStationClient.DevStationException("close failed", null))
                 .when(devStation).close("dev1", "CLI", "AK", "SK");
         when(store.findByDevStageId("dev1")).thenReturn("s1");
-        when(store.get("s1")).thenReturn(new SandboxSession("s1", "n1", "dev1", "1", "wss://x", "connected", 1L, 2L));
+        when(store.get("s1")).thenReturn(new SandboxSession("s1", "uk1", "n1", "dev1", "1", "wss://x", "connected", 1L, 2L));
 
         SandboxService.HdkitException ex = assertThrows(SandboxService.HdkitException.class,
                 () -> service.release(new ReleaseRequest(null, "dev1"), "AK", "SK"));

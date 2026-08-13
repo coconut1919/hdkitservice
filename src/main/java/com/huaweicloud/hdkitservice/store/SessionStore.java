@@ -90,6 +90,17 @@ public class SessionStore {
         return out;
     }
 
+    public List<SandboxSession> listAll() {
+        List<SandboxSession> out = new ArrayList<>();
+        Set<String> keys = redis.keys(KEY_PREFIX + "*");
+        if (keys == null) return out;
+        for (String key : keys) {
+            SandboxSession s = get(key.substring(KEY_PREFIX.length()));
+            if (s != null) out.add(s);
+        }
+        return out;
+    }
+
     public void pruneActive() {
         Set<String> active = redis.opsForSet().members(ACTIVE_SET);
         if (active == null) return;
