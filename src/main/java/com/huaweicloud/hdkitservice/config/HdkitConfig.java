@@ -18,9 +18,6 @@ public class HdkitConfig {
     @Value("${FLAVOR_ID:}")
     private String flavorId;
 
-    @Value("${SESSION_TTL:86400}")
-    private long sessionTtl;
-
     @Value("${POLL_INTERVAL_MS:5000}")
     private long pollIntervalMs;
 
@@ -30,9 +27,6 @@ public class HdkitConfig {
     @Value("${RELEASE_TIMEOUT:180000}")
     private long releaseTimeout;
 
-    @Value("${RECLAIM_INTERVAL:300000}")
-    private long reclaimInterval;
-
     @Value("${MAX_CONCURRENT:5}")
     private int maxConcurrent;
 
@@ -40,11 +34,9 @@ public class HdkitConfig {
     public String source() { return source; }
     public String templateId() { return templateId; }
     public String flavorId() { return flavorId; }
-    public long sessionTtl() { return sessionTtl; }
     public long pollIntervalMs() { return pollIntervalMs; }
     public long connectTimeout() { return connectTimeout; }
     public long releaseTimeout() { return releaseTimeout; }
-    public long reclaimInterval() { return reclaimInterval; }
     public int maxConcurrent() { return maxConcurrent; }
 
     public String endpointHost() {
