@@ -14,25 +14,6 @@ spec:
     metadata:
       labels:
         app: hdkitservice
-      annotations:
-        log.k8s.io/collection: |
-          {
-            "cce-pods": {
-              "logs": {
-                "stdout": {
-                  "contents": [
-                    {
-                      "source": "stdout",
-                      "multiline": false
-                    }
-                  ],
-                  "type": "stdout"
-                }
-              }
-            }
-          }
-        log.k8s.io/loggroup: hdkitservice-prod
-        log.k8s.io/logstream: hdkitservice-server
     spec:
       imagePullSecrets:
         - name: swr-secret
