@@ -33,45 +33,79 @@ public class SandboxService {
     }
 
     public ConnectResponse connect(ConnectRequest req, String ak, String sk) {
-        if (store.countActive() >= config.maxConcurrent()) {
-            throw new HdkitException("HDKIT_CONFLICT", "已达最大并发沙箱数 " + config.maxConcurrent(), null);
-        }
-
-        String name = (req.name() == null || req.name().isEmpty())
-                ? "hcdk" + Long.toString(System.currentTimeMillis(), 36)
-                : req.name();
         String templateId = (req.templateId() == null || req.templateId().isEmpty())
                 ? config.templateId() : req.templateId();
         String flavorId = (req.flavorId() == null || req.flavorId().isEmpty())
                 ? config.flavorId() : req.flavorId();
 
-        String devStageId = null;
-        try {
+        DevStationClient.Devenv existing = findExistingInstance(ak, sk);
+        String devStageId;
+        String name;
+        boolean created = false;
+
+        if (existing != null) {
+            // 复用已有实例
+            devStageId = existing.id();
+            name = existing.name();
+        } else {
+            if (store.countActive() >= config.maxConcurrent()) {
+                throw new HdkitException("HDKIT_CONFLICT", "已达最大并发沙箱数 " + config.maxConcurrent(), null);
+            }
+            // 新建实例（name 内部生成，保证唯一可识别）
+            name = "hcdk" + Long.toString(System.currentTimeMillis(), 36);
             devStageId = devStation.create(name, templateId, flavorId, req.source(), req.env(), req.git(), ak, sk);
+            created = true;
             waitForStatus(devStageId, CDE_READY, config.connectTimeout(), ak, sk);
-            devStation.start(devStageId, config.source(), ak, sk);
-            waitForStatus(devStageId, CDE_RUNNING, config.connectTimeout(), ak, sk);
+        }
+
+        try {
+            ensureRunning(devStageId, ak, sk);
+            devStation.autoConfig(devStageId, true, ak, sk); // 注入临时 AK/SK
 
             DevStationClient.Connections conns = devStation.connections(devStageId, config.source(), ak, sk);
             long connectionId = pickConnected(conns);
-            String address = devStation.address(devStageId, connectionId, ak, sk);
+            DevStationClient.ConnectionAddress addr = devStation.address(devStageId, connectionId, ak, sk);
+            String address = addr.url() + "&source=" + addr.source();
 
-            String sessionId = UUID.randomUUID().toString().replace("-", "").substring(0, 16);
-            long now = System.currentTimeMillis();
-            store.save(new SandboxSession(sessionId, name, devStageId, String.valueOf(connectionId),
-                    address, "connected", now, now));
-            store.addActive(sessionId);
-
+            String sessionId = upsertSession(devStageId, name, String.valueOf(connectionId), address);
             return new ConnectResponse(sessionId, devStageId, String.valueOf(connectionId), address, "connected");
         } catch (Exception e) {
             log.error("[connect] failed: {}", e.getMessage());
-            if (devStageId != null) {
+            if (created) {
                 try { releaseById(devStageId, ak, sk); } catch (Exception ex) {
                     log.error("[connect] rollback release failed: {}", ex.getMessage());
                 }
             }
             throw new HdkitException("HDKIT_CONNECT_FAILED", "连接沙箱失败", e);
         }
+    }
+
+    private DevStationClient.Devenv findExistingInstance(String ak, String sk) {
+        for (DevStationClient.Devenv d : devStation.list("", ak, sk)) {
+            if (d.name() != null && d.name().startsWith("hcdk")) {
+                return d;
+            }
+        }
+        return null;
+    }
+
+    private void ensureRunning(String devStageId, String ak, String sk) {
+        String status = devStation.statusOf(devStageId, ak, sk);
+        if (!CDE_RUNNING.equals(status)) {
+            devStation.start(devStageId, config.source(), ak, sk);
+            waitForStatus(devStageId, CDE_RUNNING, config.connectTimeout(), ak, sk);
+        }
+    }
+
+    private String upsertSession(String devStageId, String name, String connectionId, String address) {
+        String existing = store.findByDevStageId(devStageId);
+        String sessionId = (existing != null && !existing.isEmpty())
+                ? existing
+                : UUID.randomUUID().toString().replace("-", "").substring(0, 16);
+        long now = System.currentTimeMillis();
+        store.save(new SandboxSession(sessionId, name, devStageId, connectionId, address, "connected", now, now));
+        store.addActive(sessionId);
+        return sessionId;
     }
 
     public CredentialsResponse credentials(CredentialsRequest req, String ak, String sk) {

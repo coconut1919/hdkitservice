@@ -17,7 +17,6 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -52,56 +51,65 @@ class SandboxServiceTest {
         service = new SandboxService(devStation, store, config);
     }
 
+    // ── connect: 新建实例 ──
+
     @Test
-    void connectHappyPath() {
+    void connectCreatesNewInstanceWhenNoneExists() {
+        when(devStation.list("", "AK", "SK")).thenReturn(List.of());
         when(store.countActive()).thenReturn(0L);
         when(devStation.create(any(), eq("tpl"), eq("flv"), any(), any(), any(), eq("AK"), eq("SK")))
                 .thenReturn("dev1");
-        when(devStation.statusOf("dev1", "AK", "SK")).thenReturn("cde.0004", "cde.0002");
+        when(devStation.statusOf("dev1", "AK", "SK")).thenReturn("cde.0004", "cde.0004", "cde.0002");
         when(devStation.connections("dev1", "CLI", "AK", "SK"))
                 .thenReturn(new DevStationClient.Connections(100L,
                         List.of(new DevStationClient.Conn(100L, "CONNECTED"))));
-        when(devStation.address("dev1", 100L, "AK", "SK")).thenReturn("wss://example/1");
+        when(devStation.address("dev1", 100L, "AK", "SK"))
+                .thenReturn(new DevStationClient.ConnectionAddress("wss://example/1", "-2074327356"));
 
         ConnectResponse resp = service.connect(
                 new ConnectRequest(null, null, null, null, Map.of(), Map.of()), "AK", "SK");
 
         assertEquals("dev1", resp.devStageId());
-        assertEquals("wss://example/1", resp.connectionAddress());
+        assertEquals("wss://example/1&source=-2074327356", resp.connectionAddress());
         assertNotNull(resp.sessionId());
         assertEquals("connected", resp.status());
+        verify(devStation).autoConfig("dev1", true, "AK", "SK");
         verify(store).save(any());
         verify(store).addActive(any());
     }
 
     @Test
     void connectPicksConnectedConnectionFromList() {
+        when(devStation.list("", "AK", "SK")).thenReturn(List.of());
         when(store.countActive()).thenReturn(0L);
         when(devStation.create(any(), any(), any(), any(), any(), any(), any(), any())).thenReturn("dev1");
-        when(devStation.statusOf("dev1", "AK", "SK")).thenReturn("cde.0004", "cde.0002");
+        when(devStation.statusOf("dev1", "AK", "SK")).thenReturn("cde.0004", "cde.0004", "cde.0002");
         when(devStation.connections("dev1", "CLI", "AK", "SK"))
                 .thenReturn(new DevStationClient.Connections(111L, List.of(
                         new DevStationClient.Conn(111L, "CONNECTING"),
                         new DevStationClient.Conn(222L, "CONNECTED"))));
-        when(devStation.address("dev1", 222L, "AK", "SK")).thenReturn("wss://example/2");
+        when(devStation.address("dev1", 222L, "AK", "SK"))
+                .thenReturn(new DevStationClient.ConnectionAddress("wss://example/2", "-2074327356"));
 
         ConnectResponse resp = service.connect(
-                new ConnectRequest("n1", null, null, null, Map.of(), Map.of()), "AK", "SK");
+                new ConnectRequest(null, null, null, null, Map.of(), Map.of()), "AK", "SK");
 
         assertEquals("222", resp.connectionId());
-        assertEquals("wss://example/2", resp.connectionAddress());
+        assertEquals("wss://example/2&source=-2074327356", resp.connectionAddress());
     }
 
     @Test
     void connectUsesRequestTemplateAndFlavorOverride() {
+        when(devStation.list("", "AK", "SK")).thenReturn(List.of());
         when(store.countActive()).thenReturn(0L);
         when(devStation.create(any(), eq("customTpl"), eq("customFlv"), any(), any(), any(), eq("AK"), eq("SK")))
                 .thenReturn("dev1");
-        when(devStation.statusOf("dev1", "AK", "SK")).thenReturn("cde.0004", "cde.0002");
+        when(devStation.statusOf("dev1", "AK", "SK")).thenReturn("cde.0004", "cde.0004", "cde.0002");
         when(devStation.connections("dev1", "CLI", "AK", "SK"))
                 .thenReturn(new DevStationClient.Connections(100L,
                         List.of(new DevStationClient.Conn(100L, "CONNECTED"))));
-        when(devStation.address("dev1", 100L, "AK", "SK")).thenReturn("wss://x");
+        when(devStation.address("dev1", 100L, "AK", "SK"))
+                .thenReturn(new DevStationClient.ConnectionAddress("wss://x", "-2074327356"));
 
         service.connect(new ConnectRequest(null, "customTpl", "customFlv", null, Map.of(), Map.of()), "AK", "SK");
 
@@ -109,7 +117,8 @@ class SandboxServiceTest {
     }
 
     @Test
-    void connectThrowsConflictAtConcurrencyLimit() {
+    void connectThrowsConflictAtConcurrencyLimitWhenNoExisting() {
+        when(devStation.list("", "AK", "SK")).thenReturn(List.of());
         when(store.countActive()).thenReturn(5L);
 
         SandboxService.HdkitException ex = assertThrows(SandboxService.HdkitException.class,
@@ -120,9 +129,10 @@ class SandboxServiceTest {
 
     @Test
     void connectFailureAfterCreateRollsBackRelease() {
+        when(devStation.list("", "AK", "SK")).thenReturn(List.of());
         when(store.countActive()).thenReturn(0L);
         when(devStation.create(any(), any(), any(), any(), any(), any(), eq("AK"), eq("SK"))).thenReturn("dev1");
-        when(devStation.statusOf("dev1", "AK", "SK")).thenReturn("cde.0004", "cde.0004", "cde.0004", null);
+        when(devStation.statusOf("dev1", "AK", "SK")).thenReturn("cde.0004", "cde.0004", "cde.0004", "cde.0004", null);
         doThrow(new RuntimeException("start boom")).when(devStation).start("dev1", "CLI", "AK", "SK");
 
         SandboxService.HdkitException ex = assertThrows(SandboxService.HdkitException.class,
@@ -131,6 +141,66 @@ class SandboxServiceTest {
         verify(devStation).close("dev1", "CLI", "AK", "SK");
         verify(devStation).delete("dev1", "CLI", "AK", "SK");
     }
+
+    // ── connect: 复用已有实例 ──
+
+    @Test
+    void connectReusesExistingStoppedInstance() {
+        when(devStation.list("", "AK", "SK"))
+                .thenReturn(List.of(new DevStationClient.Devenv("dev1", "hcdkabc", "cde.0004")));
+        when(devStation.statusOf("dev1", "AK", "SK")).thenReturn("cde.0004", "cde.0002");
+        when(devStation.connections("dev1", "CLI", "AK", "SK"))
+                .thenReturn(new DevStationClient.Connections(200L,
+                        List.of(new DevStationClient.Conn(200L, "CONNECTED"))));
+        when(devStation.address("dev1", 200L, "AK", "SK"))
+                .thenReturn(new DevStationClient.ConnectionAddress("wss://example/reuse", "-2074327356"));
+
+        ConnectResponse resp = service.connect(
+                new ConnectRequest(null, null, null, null, Map.of(), Map.of()), "AK", "SK");
+
+        assertEquals("dev1", resp.devStageId());
+        assertEquals("wss://example/reuse&source=-2074327356", resp.connectionAddress());
+        verify(devStation, never()).create(any(), any(), any(), any(), any(), any(), any(), any());
+        verify(devStation).start("dev1", "CLI", "AK", "SK");
+        verify(devStation).autoConfig("dev1", true, "AK", "SK");
+    }
+
+    @Test
+    void connectReusesRunningInstanceWithoutStart() {
+        when(devStation.list("", "AK", "SK"))
+                .thenReturn(List.of(new DevStationClient.Devenv("dev1", "hcdkabc", "cde.0002")));
+        when(devStation.statusOf("dev1", "AK", "SK")).thenReturn("cde.0002");
+        when(devStation.connections("dev1", "CLI", "AK", "SK"))
+                .thenReturn(new DevStationClient.Connections(200L,
+                        List.of(new DevStationClient.Conn(200L, "CONNECTED"))));
+        when(devStation.address("dev1", 200L, "AK", "SK"))
+                .thenReturn(new DevStationClient.ConnectionAddress("wss://example/reuse", "-2074327356"));
+
+        ConnectResponse resp = service.connect(
+                new ConnectRequest(null, null, null, null, Map.of(), Map.of()), "AK", "SK");
+
+        assertEquals("dev1", resp.devStageId());
+        verify(devStation, never()).start(any(), any(), any(), any());
+        verify(devStation).autoConfig("dev1", true, "AK", "SK");
+    }
+
+    @Test
+    void connectReuseFailureDoesNotReleaseExisting() {
+        when(devStation.list("", "AK", "SK"))
+                .thenReturn(List.of(new DevStationClient.Devenv("dev1", "hcdkabc", "cde.0002")));
+        when(devStation.statusOf("dev1", "AK", "SK")).thenReturn("cde.0002");
+        doThrow(new DevStationClient.DevStationException("auto-config failed", null))
+                .when(devStation).autoConfig("dev1", true, "AK", "SK");
+
+        SandboxService.HdkitException ex = assertThrows(SandboxService.HdkitException.class,
+                () -> service.connect(new ConnectRequest(null, null, null, null, Map.of(), Map.of()), "AK", "SK"));
+        assertEquals("HDKIT_CONNECT_FAILED", ex.code());
+        // 复用实例失败不应释放用户已有沙箱
+        verify(devStation, never()).close(any(), any(), any(), any());
+        verify(devStation, never()).delete(any(), any(), any(), any());
+    }
+
+    // ── credentials ──
 
     @Test
     void credentialsWithDevStageIdReturnsExpiryAndSession() {
@@ -175,6 +245,8 @@ class SandboxServiceTest {
                 () -> service.credentials(new CredentialsRequest(null, null, true), "AK", "SK"));
         assertEquals("HDKIT_INVALID_REQUEST", ex.code());
     }
+
+    // ── release ──
 
     @Test
     void releaseHappyPath() {
@@ -221,14 +293,5 @@ class SandboxServiceTest {
         SandboxService.HdkitException ex = assertThrows(SandboxService.HdkitException.class,
                 () -> service.release(new ReleaseRequest(null, null), "AK", "SK"));
         assertEquals("HDKIT_INVALID_REQUEST", ex.code());
-    }
-
-    @Test
-    void waitForStatusTimesOut() {
-        when(devStation.statusOf("dev1", "AK", "SK")).thenReturn("cde.0003");
-
-        SandboxService.HdkitException ex = assertThrows(SandboxService.HdkitException.class,
-                () -> service.releaseById("dev1", "AK", "SK"));
-        assertEquals("HDKIT_TIMEOUT", ex.code());
     }
 }

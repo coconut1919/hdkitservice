@@ -115,15 +115,18 @@ class DevStationClientTest {
     }
 
     @Test
-    void addressReturnsUrl() {
+    void addressReturnsUrlAndSource() {
         server.expect(requestTo("https://devstation.myhuaweicloud.com/open-api-public/v1/devenvs/dev1/connections/100"))
                 .andExpect(method(HttpMethod.GET))
                 .andRespond(withSuccess(
-                        "{\"result\":{\"connection_id\":100,\"connection_info\":{\"url\":\"wss://example/1\"},"
-                                + "\"status\":\"CONNECTED\"},\"error_msg\":\"success\",\"error_code\":\"0000\"}",
+                        "{\"result\":{\"connection_id\":100,\"connection_info\":{\"extensions\":{\"source\":-2074327356},"
+                                + "\"url\":\"wss://example/1\"},\"status\":\"CONNECTED\"},"
+                                + "\"error_msg\":\"success\",\"error_code\":\"0000\"}",
                         MediaType.APPLICATION_JSON));
 
-        assertEquals("wss://example/1", client.address("dev1", 100L, "TESTAK", "TESTSK"));
+        DevStationClient.ConnectionAddress addr = client.address("dev1", 100L, "TESTAK", "TESTSK");
+        assertEquals("wss://example/1", addr.url());
+        assertEquals("-2074327356", addr.source());
         server.verify();
     }
 

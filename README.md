@@ -29,7 +29,7 @@ Redis (DCS)：会话持久化 session → {name, devStageId, connectionId, addre
 
 ### 1. 连接沙箱（压缩）`POST /connect`
 
-一次完成「创建 → 开机 → 取连接通道 → 取连接地址」。
+**一用户一实例**：按调用方 AK 识别，先复用已有沙箱（开机 + 注入临时 AK/SK），没有才新建，返回新 wss 连接地址。
 
 ```bash
 curl -X POST http://<host>:<port>/rest/developer/server/hdkitservice/connect \
@@ -45,12 +45,12 @@ curl -X POST http://<host>:<port>/rest/developer/server/hdkitservice/connect \
   "session_id": "sess_a1b2c3",
   "dev_stage_id": "9a2263d6ef534879af7b51f166ff24b7",
   "connection_id": "373117",
-  "connection_address": "wss://...?connect_code=...&ws_type=1",
+  "connection_address": "wss://...?connect_code=...&ws_type=1&source=-2074327356",
   "status": "connected"
 }
 ```
 
-入参说明：`name` 可选（不传自动生成）；`template_id`/`flavor_id` 可选（不传用环境变量）；`source` 可选（默认 `WEB`）；`env`/`git` 可选。
+入参说明：`template_id`/`flavor_id`/`source`/`env`/`git` 均仅新建时生效（可选，默认取环境变量）；沙箱 `name` 由服务端自动生成。
 
 ### 2. 配置临时 AK/SK `POST /credentials`
 

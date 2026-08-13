@@ -130,10 +130,13 @@ public class DevStationClient {
         return new Connections(main, list);
     }
 
-    public String address(String devStageId, long connectionId, String ak, String sk) {
+    public ConnectionAddress address(String devStageId, long connectionId, String ak, String sk) {
         JsonNode r = call("GET", "/open-api-public/v1/devenvs/" + devStageId
                 + "/connections/" + connectionId, "", "", ak, sk);
-        return r.path("result").path("connection_info").path("url").asText();
+        JsonNode info = r.path("result").path("connection_info");
+        String url = info.path("url").asText();
+        String source = info.path("extensions").path("source").asText();
+        return new ConnectionAddress(url, source);
     }
 
     public String autoConfig(String devStageId, boolean enableSts, String ak, String sk) {
@@ -145,6 +148,7 @@ public class DevStationClient {
     public record Devenv(String id, String name, String status) {}
     public record Conn(long connectionId, String status) {}
     public record Connections(long connectionId, List<Conn> list) {}
+    public record ConnectionAddress(String url, String source) {}
 
     public static class DevStationException extends RuntimeException {
         public DevStationException(String message, Throwable cause) { super(message, cause); }
