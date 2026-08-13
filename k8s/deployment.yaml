@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: hdkitservice
-  namespace: huaweicloud-agent
+  namespace: backend
   labels:
     app: hdkitservice
 spec:

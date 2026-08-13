@@ -17,7 +17,7 @@ AUTH=$(hcloud SWR CreateSecret --cli-region=cn-south-1 \
   | python3 -c 'import sys,json; print(json.load(sys.stdin)["auths"]["swr.cn-south-1.myhuaweicloud.com"]["auth"])')
 U=$(echo $AUTH | base64 -d | cut -d: -f1)
 P=$(echo $AUTH | base64 -d | cut -d: -f2)
-kubectl create secret docker-registry swr-secret -n huaweicloud-agent \
+kubectl create secret docker-registry swr-secret -n backend \
   --docker-server=swr.cn-south-1.myhuaweicloud.com \
   --docker-username="$U" --docker-password="$P" \
   --dry-run=client -o yaml | kubectl apply -f -
@@ -28,7 +28,7 @@ kubectl create secret docker-registry swr-secret -n huaweicloud-agent \
 将 `<值>` 替换为 prod 环境实际值：
 
 ```bash
-kubectl create secret generic app-secrets -n huaweicloud-agent \
+kubectl create secret generic app-secrets -n backend \
   --from-literal=REDIS_HOST=<prod Redis 地址> \
   --from-literal=REDIS_PORT=6379 \
   --from-literal=REDIS_PASSWORD=<prod Redis 密码> \
@@ -52,8 +52,8 @@ kubectl apply -f k8s/service.yaml
 ## 步骤 4：验证
 
 ```bash
-kubectl get pods -n huaweicloud-agent -l app=hdkitservice
-kubectl logs -n huaweicloud-agent -l app=hdkitservice --tail=50
+kubectl get pods -n backend -l app=hdkitservice
+kubectl logs -n backend -l app=hdkitservice --tail=50
 ```
 
 预期日志关键行：
@@ -67,7 +67,7 @@ Started HdkitServiceApplication           # 应用启动完成
 接口验证（需真实 AK/SK）：
 
 ```bash
-kubectl port-forward -n huaweicloud-agent svc/hdkitservice-svc 3001:3001 &
+kubectl port-forward -n backend svc/hdkitservice-svc 3001:3001 &
 curl -H "X-HW-AK: <AK>" -H "X-HW-SK: <SK>" \
   http://127.0.0.1:3001/rest/developer/server/hdkitservice/check-user
 ```
