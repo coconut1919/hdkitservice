@@ -2,6 +2,23 @@
 
 目标集群：`cce-hd-devkit-prod`（私有集群，从集群内网环境执行）
 
+## 发布流程（CI/CD 自动）
+
+生产发布由 **tag 触发**，合入 main 不再自动发版：
+
+1. 将 `dev` 合并到 `main`（仅触发 CI 与安全扫描，不部署）
+2. 确认可发布后打 tag 并推送：
+
+   ```bash
+   git checkout main && git pull
+   git tag v1.2.0 && git push origin v1.2.0
+   ```
+
+3. tag `v*` 触发 `cd-production.yml`：构建镜像 `hdkitservice:v1.2.0`、推送 SWR、滚动更新 CCE
+
+镜像 tag 与 git tag 一致（如 `v1.2.0`），可追溯、可回滚（`kubectl rollout undo`）。
+如需额外人工审批，可在 GitHub 仓库的 `production` Environment 中配置 required reviewers。
+
 ## 前置条件
 
 - 已登录 SWR（`hcloud SWR CreateSecret --cli-region=cn-south-1` 可获取临时登录凭证）

@@ -2,7 +2,7 @@ name: CD Production
 
 on:
   push:
-    branches: [main]
+    tags: ['v*']
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -45,10 +45,8 @@ jobs:
 
       - name: Build & Push image
         run: |
-          TAG=$(date +%Y%m%d%H%M%S)
-          echo "TAG=$TAG" >> "$GITHUB_ENV"
-          docker build -t $REGISTRY/$IMAGE:$TAG .
-          docker push $REGISTRY/$IMAGE:$TAG
+          docker build -t $REGISTRY/$IMAGE:${{ github.ref_name }} .
+          docker push $REGISTRY/$IMAGE:${{ github.ref_name }}
 
   deploy:
     needs: build-push
@@ -67,6 +65,6 @@ jobs:
           script: |
             kubectl --kubeconfig=/tmp/kubeconfig.json -n ${{ env.NAMESPACE }} \
               set image deployment/${{ env.WORKLOAD }} \
-              server=${{ env.REGISTRY }}/${{ env.IMAGE }}:$TAG
+              server=${{ env.REGISTRY }}/${{ env.IMAGE }}:${{ github.ref_name }}
             kubectl --kubeconfig=/tmp/kubeconfig.json -n ${{ env.NAMESPACE }} \
               rollout status deployment/${{ env.WORKLOAD }} --timeout=120s
