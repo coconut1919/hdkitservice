@@ -3,6 +3,9 @@ package com.huaweicloud.hdkitservice.config;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Component
 public class HdkitConfig {
 
@@ -30,6 +33,9 @@ public class HdkitConfig {
     @Value("${MAX_CONCURRENT:5}")
     private int maxConcurrent;
 
+    @Value("${LOG_MASK_KEYS:password,passwd,pwd,secret,token,sk,access_key,private_key,authorization,cookie,credential}")
+    private String maskKeys;
+
     public String endpoint() { return endpoint; }
     public String source() { return source; }
     public String templateId() { return templateId; }
@@ -38,6 +44,16 @@ public class HdkitConfig {
     public long connectTimeout() { return connectTimeout; }
     public long releaseTimeout() { return releaseTimeout; }
     public int maxConcurrent() { return maxConcurrent; }
+
+    public List<String> maskKeys() {
+        List<String> out = new ArrayList<>();
+        if (maskKeys == null || maskKeys.isBlank()) return out;
+        for (String part : maskKeys.split(",")) {
+            String key = part.trim().toLowerCase();
+            if (!key.isEmpty()) out.add(key);
+        }
+        return out;
+    }
 
     public String endpointHost() {
         return endpoint.replaceFirst("^https?://", "").replaceFirst("/$", "");
@@ -51,4 +67,5 @@ public class HdkitConfig {
     public void setConnectTimeout(long connectTimeout) { this.connectTimeout = connectTimeout; }
     public void setReleaseTimeout(long releaseTimeout) { this.releaseTimeout = releaseTimeout; }
     public void setMaxConcurrent(int maxConcurrent) { this.maxConcurrent = maxConcurrent; }
+    public void setMaskKeys(String maskKeys) { this.maskKeys = maskKeys; }
 }

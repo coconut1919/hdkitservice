@@ -2,6 +2,7 @@ package com.huaweicloud.hdkitservice.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.huaweicloud.hdkitservice.config.HdkitConfig;
+import com.huaweicloud.hdkitservice.util.Masker;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
@@ -35,7 +36,7 @@ class DevStationClientTest {
         config.setSource("CLI");
         RestClient.Builder builder = RestClient.builder();
         server = MockRestServiceServer.bindTo(builder).build();
-        client = new DevStationClient(config, mapper, builder);
+        client = new DevStationClient(config, mapper, new Masker(config), builder);
     }
 
     @Test

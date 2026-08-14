@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.huaweicloud.hdkitservice.config.HdkitConfig;
 import com.huaweicloud.hdkitservice.sign.Signer;
+import com.huaweicloud.hdkitservice.util.Masker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -24,16 +25,18 @@ public class DevStationClient {
 
     private final HdkitConfig config;
     private final ObjectMapper mapper;
+    private final Masker masker;
     private final RestClient restClient;
 
     @Autowired
-    public DevStationClient(HdkitConfig config, ObjectMapper mapper) {
-        this(config, mapper, RestClient.builder());
+    public DevStationClient(HdkitConfig config, ObjectMapper mapper, Masker masker) {
+        this(config, mapper, masker, RestClient.builder());
     }
 
-    DevStationClient(HdkitConfig config, ObjectMapper mapper, RestClient.Builder builder) {
+    DevStationClient(HdkitConfig config, ObjectMapper mapper, Masker masker, RestClient.Builder builder) {
         this.config = config;
         this.mapper = mapper;
+        this.masker = masker;
         this.restClient = builder.baseUrl(config.endpoint())
                 .defaultHeader("Content-Type", "application/json")
                 .build();
@@ -45,7 +48,7 @@ public class DevStationClient {
         String uri = path + (query.isEmpty() ? "" : "?" + query);
         String requestId = MDC.get("requestId");
         long start = System.currentTimeMillis();
-        callLog.info("[call] {} {} {}", requestId, method, uri);
+        callLog.info("[call] {} {} {} req={}", requestId, method, uri, masker.mask(body == null ? "" : body));
         try {
             var spec = restClient.method(HttpMethod.valueOf(method))
                     .uri(uri)
@@ -60,20 +63,21 @@ public class DevStationClient {
             long duration = System.currentTimeMillis() - start;
             if (!errorCode.isEmpty() && !"0000".equals(errorCode)) {
                 String errorMsg = root.path("error_msg").asText();
-                callLog.error("[call] {} {} {} <- upstream_error code={} msg={} dur={}ms",
-                        requestId, method, path, errorCode, errorMsg, duration);
+                callLog.error("[call] {} {} {} <- upstream_error code={} msg={} resp={} dur={}ms",
+                        requestId, method, path, errorCode, errorMsg, masker.mask(resp), duration);
                 log.error("[devstation] {} {} upstream error {}: {}", method, path, errorCode, errorMsg);
                 throw new DevStationException(method + " " + path + " upstream error " + errorCode
                         + ": " + errorMsg, null);
             }
-            callLog.info("[call] {} {} {} <- ok dur={}ms", requestId, method, path, duration);
+            callLog.info("[call] {} {} {} <- ok dur={}ms resp={}",
+                    requestId, method, path, duration, masker.mask(resp));
             return root;
         } catch (DevStationException e) {
             throw e;
         } catch (Exception e) {
             long duration = System.currentTimeMillis() - start;
             callLog.error("[call] {} {} {} <- failed err={} dur={}ms",
-                    requestId, method, path, e.getMessage(), duration);
+                    requestId, method, path, masker.mask(e.getMessage()), duration);
             log.error("[devstation] {} {} failed: {}", method, path, e.getMessage());
             throw new DevStationException(method + " " + path + " failed", e);
         }

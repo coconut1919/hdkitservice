@@ -1,7 +1,6 @@
 package com.huaweicloud.hdkitservice.config;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.huaweicloud.hdkitservice.util.Masker;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -12,6 +11,7 @@ import org.slf4j.MDC;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.web.util.ContentCachingRequestWrapper;
+import org.springframework.web.util.ContentCachingResponseWrapper;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -21,7 +21,12 @@ import java.util.UUID;
 public class AccessLogFilter extends OncePerRequestFilter {
 
     private static final Logger log = LoggerFactory.getLogger("com.huaweicloud.hdkitservice.interface");
-    private static final ObjectMapper mapper = new ObjectMapper();
+
+    private final Masker masker;
+
+    public AccessLogFilter(Masker masker) {
+        this.masker = masker;
+    }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
@@ -29,20 +34,32 @@ public class AccessLogFilter extends OncePerRequestFilter {
         String requestId = UUID.randomUUID().toString();
         MDC.put("requestId", requestId);
         ContentCachingRequestWrapper wrapped = new ContentCachingRequestWrapper(request);
+        ContentCachingResponseWrapper responseWrapper = new ContentCachingResponseWrapper(response);
         long start = System.currentTimeMillis();
         try {
-            chain.doFilter(wrapped, response);
+            chain.doFilter(wrapped, responseWrapper);
         } finally {
             long duration = System.currentTimeMillis() - start;
-            String body = new String(wrapped.getContentAsByteArray(), StandardCharsets.UTF_8);
-            log.info("[interface] {} {} {} status={} dur={}ms ak={} {}",
+            String reqBody = new String(wrapped.getContentAsByteArray(), StandardCharsets.UTF_8);
+            String respBody = new String(responseWrapper.getContentAsByteArray(), StandardCharsets.UTF_8);
+            String uri = request.getRequestURI();
+            String query = request.getQueryString();
+            if (query != null && !query.isEmpty()) {
+                uri = uri + "?" + masker.maskQuery(query);
+            }
+            log.info("[interface] {} {} {} status={} dur={}ms ak={} req={} resp={}",
                     requestId,
                     request.getMethod(),
-                    request.getRequestURI(),
-                    response.getStatus(),
+                    uri,
+                    responseWrapper.getStatus(),
                     duration,
                     mask(request.getHeader("X-HW-AK")),
-                    summarize(body));
+                    masker.mask(reqBody),
+                    masker.mask(respBody));
+            try {
+                responseWrapper.copyBodyToResponse();
+            } catch (IOException ignored) {
+            }
             MDC.remove("requestId");
         }
     }
@@ -51,28 +68,5 @@ public class AccessLogFilter extends OncePerRequestFilter {
         if (ak == null || ak.isEmpty()) return "-";
         if (ak.length() <= 8) return "***";
         return ak.substring(0, 4) + "***" + ak.substring(ak.length() - 4);
-    }
-
-    private String summarize(String body) {
-        if (body == null || body.isBlank()) return "";
-        try {
-            JsonNode root = mapper.readTree(body);
-            StringBuilder sb = new StringBuilder();
-            append(sb, root, "template_id");
-            append(sb, root, "flavor_id");
-            append(sb, root, "session_id");
-            append(sb, root, "dev_stage_id");
-            append(sb, root, "source");
-            return sb.toString().trim();
-        } catch (Exception e) {
-            return "";
-        }
-    }
-
-    private void append(StringBuilder sb, JsonNode root, String field) {
-        JsonNode v = root.get(field);
-        if (v != null && v.isTextual() && !v.asText().isEmpty()) {
-            sb.append(field).append("=").append(v.asText()).append(" ");
-        }
     }
 }
