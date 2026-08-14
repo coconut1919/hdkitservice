@@ -4,6 +4,7 @@ import com.huaweicloud.hdkitservice.model.ErrorResponse;
 import com.huaweicloud.hdkitservice.service.SandboxService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MissingRequestHeaderException;
@@ -35,20 +36,25 @@ public class GlobalExceptionHandler {
         log.error("[error] {}: {}", e.code(), e.getMessage());
         HttpStatus status = STATUS_MAP.getOrDefault(e.code(), HttpStatus.INTERNAL_SERVER_ERROR);
         return ResponseEntity.status(status)
-                .body(new ErrorResponse(e.code(), e.getMessage(), UUID.randomUUID().toString()));
+                .body(new ErrorResponse(e.code(), e.getMessage(), traceId()));
     }
 
     @ExceptionHandler(MissingRequestHeaderException.class)
     public ResponseEntity<ErrorResponse> handleMissingHeader(MissingRequestHeaderException e) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(new ErrorResponse("HDKIT_INVALID_REQUEST", "缺少请求头 " + e.getHeaderName(),
-                        UUID.randomUUID().toString()));
+                        traceId()));
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleOther(Exception e) {
         log.error("[error] unexpected: {}", e.getMessage(), e);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(new ErrorResponse("HDKIT_INTERNAL", "服务内部错误", UUID.randomUUID().toString()));
+                .body(new ErrorResponse("HDKIT_INTERNAL", "服务内部错误", traceId()));
+    }
+
+    private String traceId() {
+        String requestId = MDC.get("requestId");
+        return requestId != null ? requestId : UUID.randomUUID().toString();
     }
 }

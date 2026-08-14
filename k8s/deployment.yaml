@@ -24,7 +24,12 @@ spec:
           ports:
             - containerPort: 3001
               protocol: TCP
+          volumeMounts:
+            - name: log-volume
+              mountPath: /app/logs
           env:
+            - name: LOG_DIR
+              value: "/app/logs"
             - name: PORT
               value: "3001"
             - name: MYSQL_HOST
@@ -79,3 +84,6 @@ spec:
               port: 3001
             initialDelaySeconds: 30
             periodSeconds: 10
+      volumes:
+        - name: log-volume
+          emptyDir: {}

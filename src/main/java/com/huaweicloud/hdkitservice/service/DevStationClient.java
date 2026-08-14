@@ -6,6 +6,7 @@ import com.huaweicloud.hdkitservice.config.HdkitConfig;
 import com.huaweicloud.hdkitservice.sign.Signer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Component;
@@ -19,6 +20,7 @@ import java.util.Map;
 public class DevStationClient {
 
     private static final Logger log = LoggerFactory.getLogger(DevStationClient.class);
+    private static final Logger callLog = LoggerFactory.getLogger("com.huaweicloud.hdkitservice.call");
 
     private final HdkitConfig config;
     private final ObjectMapper mapper;
@@ -41,6 +43,9 @@ public class DevStationClient {
         Signer.SignResult sr = Signer.sign(method, path, query, body == null ? "" : body,
                 ak, sk, config.endpointHost());
         String uri = path + (query.isEmpty() ? "" : "?" + query);
+        String requestId = MDC.get("requestId");
+        long start = System.currentTimeMillis();
+        callLog.info("[call] {} {} {}", requestId, method, uri);
         try {
             var spec = restClient.method(HttpMethod.valueOf(method))
                     .uri(uri)
@@ -52,16 +57,23 @@ public class DevStationClient {
             String resp = spec.retrieve().body(String.class);
             JsonNode root = mapper.readTree(resp);
             String errorCode = root.path("error_code").asText();
+            long duration = System.currentTimeMillis() - start;
             if (!errorCode.isEmpty() && !"0000".equals(errorCode)) {
                 String errorMsg = root.path("error_msg").asText();
+                callLog.error("[call] {} {} {} <- upstream_error code={} msg={} dur={}ms",
+                        requestId, method, path, errorCode, errorMsg, duration);
                 log.error("[devstation] {} {} upstream error {}: {}", method, path, errorCode, errorMsg);
                 throw new DevStationException(method + " " + path + " upstream error " + errorCode
                         + ": " + errorMsg, null);
             }
+            callLog.info("[call] {} {} {} <- ok dur={}ms", requestId, method, path, duration);
             return root;
         } catch (DevStationException e) {
             throw e;
         } catch (Exception e) {
+            long duration = System.currentTimeMillis() - start;
+            callLog.error("[call] {} {} {} <- failed err={} dur={}ms",
+                    requestId, method, path, e.getMessage(), duration);
             log.error("[devstation] {} {} failed: {}", method, path, e.getMessage());
             throw new DevStationException(method + " " + path + " failed", e);
         }
