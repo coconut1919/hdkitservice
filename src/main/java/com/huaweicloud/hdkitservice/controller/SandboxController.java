@@ -5,8 +5,6 @@ import com.huaweicloud.hdkitservice.model.ConnectRequest;
 import com.huaweicloud.hdkitservice.model.ConnectResponse;
 import com.huaweicloud.hdkitservice.model.CredentialsRequest;
 import com.huaweicloud.hdkitservice.model.CredentialsResponse;
-import com.huaweicloud.hdkitservice.model.ReleaseRequest;
-import com.huaweicloud.hdkitservice.model.ReleaseResponse;
 import com.huaweicloud.hdkitservice.model.SignAgreementResponse;
 import com.huaweicloud.hdkitservice.service.SandboxService;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -50,12 +48,5 @@ public class SandboxController {
                                            @RequestHeader("X-HW-AK") String ak,
                                            @RequestHeader("X-HW-SK") String sk) {
         return service.credentials(req, ak, sk);
-    }
-
-    @PostMapping("/release")
-    public ReleaseResponse release(@RequestBody ReleaseRequest req,
-                                   @RequestHeader("X-HW-AK") String ak,
-                                   @RequestHeader("X-HW-SK") String sk) {
-        return service.release(req, ak, sk);
     }
 }

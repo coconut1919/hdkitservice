@@ -1,6 +1,6 @@
 # hdkitservice
 
-封装华为云 **DevStation（云开发环境/沙箱）** 开放 API 的微服务，向上层调用方提供三个「压缩」接口，隐藏创建、开机、取连接、释放等多步编排细节。
+封装华为云 **DevStation（云开发环境/沙箱）** 开放 API 的微服务，向上层调用方提供「压缩」接口，隐藏创建、开机、取连接等多步编排细节。
 
 ## 技术栈
 
@@ -69,24 +69,7 @@ curl -X POST http://<host>:<port>/rest/developer/server/hdkitservice/credentials
 { "session_id": "9a2263d6ef534879af7b51f166ff24b7", "expires_at": "2026-08-14T04:39:54Z" }
 ```
 
-### 3. 释放沙箱 `POST /release`
-
-一次完成「关机 → 释放」（幂等，环境已不存在视为成功）。
-
-```bash
-curl -X POST http://<host>:<port>/rest/developer/server/hdkitservice/release \
-  -H 'Content-Type: application/json' \
-  -H 'X-HW-AK: <AK>' -H 'X-HW-SK: <SK>' \
-  -d '{"dev_stage_id":"<dev_stage_id>"}'
-```
-
-响应：
-
-```json
-{ "released": true, "dev_stage_id": "9a2263d6ef534879af7b51f166ff24b7" }
-```
-
-`credentials` / `release` 的入参 `session_id` 是 `dev_stage_id` 的别名，二者等价。
+`credentials` 的入参 `session_id` 是 `dev_stage_id` 的别名，二者等价。
 
 ### 错误响应
 
@@ -143,7 +126,6 @@ java -jar target/hdkitservice-0.0.1.jar
 |-------------------|--------------|
 | `/connect` | ① `POST /open-api-public/v2/devenvs` ② 轮询列表至 `cde.0004` ③ `POST /open-api-public/v1/devenvs/{id}/start` ④ 轮询至 `cde.0002` ⑤ `POST .../connections` ⑥ `GET .../connections/{connId}` |
 | `/credentials` | ① 轮询确认 `cde.0002` ② `POST /open-api-public/v1/auto-config` |
-| `/release` | ① `POST .../close` ② 轮询至 `cde.0004` ③ `DELETE .../devenvs/{id}?source=CLI` ④ 轮询至环境消失 |
 
 关键字段（已实测）：创建返回 `result.dev_stage_instance_id`；连接地址 `result.connection_info.url`；临时凭证过期 `result.sts_expires_at`。状态码 `cde.0002`=RUNNING、`cde.0004`=已就绪/关机。**删除前必须先关机完成**，否则报 `HD.98320063`。
 

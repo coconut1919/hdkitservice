@@ -3,7 +3,6 @@ package com.huaweicloud.hdkitservice.controller;
 import com.huaweicloud.hdkitservice.model.CheckUserResponse;
 import com.huaweicloud.hdkitservice.model.ConnectResponse;
 import com.huaweicloud.hdkitservice.model.CredentialsResponse;
-import com.huaweicloud.hdkitservice.model.ReleaseResponse;
 import com.huaweicloud.hdkitservice.model.SignAgreementResponse;
 import com.huaweicloud.hdkitservice.service.SandboxService;
 import org.junit.jupiter.api.Test;
@@ -65,19 +64,6 @@ class SandboxControllerTest {
                         .content("{\"dev_stage_id\":\"dev1\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.expiresAt").value("2026-08-14T04:39:54Z"));
-    }
-
-    @Test
-    void releaseEndpoint() throws Exception {
-        when(service.release(any(), eq("AK"), eq("SK")))
-                .thenReturn(new ReleaseResponse(true, "dev1"));
-
-        mvc.perform(post("/rest/developer/server/hdkitservice/release")
-                        .header("X-HW-AK", "AK").header("X-HW-SK", "SK")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"dev_stage_id\":\"dev1\"}"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.released").value(true));
     }
 
     @Test

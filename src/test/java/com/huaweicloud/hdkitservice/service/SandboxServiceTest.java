@@ -6,8 +6,6 @@ import com.huaweicloud.hdkitservice.model.ConnectRequest;
 import com.huaweicloud.hdkitservice.model.ConnectResponse;
 import com.huaweicloud.hdkitservice.model.CredentialsRequest;
 import com.huaweicloud.hdkitservice.model.CredentialsResponse;
-import com.huaweicloud.hdkitservice.model.ReleaseRequest;
-import com.huaweicloud.hdkitservice.model.ReleaseResponse;
 import com.huaweicloud.hdkitservice.model.SignAgreementResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -264,49 +262,6 @@ class SandboxServiceTest {
     void credentialsMissingIdsThrows() {
         SandboxService.HdkitException ex = assertThrows(SandboxService.HdkitException.class,
                 () -> service.credentials(new CredentialsRequest(null, null, true), "AK", "SK"));
-        assertEquals("HDKIT_INVALID_REQUEST", ex.code());
-    }
-
-    // ── release ──
-
-    @Test
-    void releaseHappyPath() {
-        when(devStation.statusOf("dev1", "AK", "SK")).thenReturn("cde.0004", "cde.0004", null);
-
-        ReleaseResponse resp = service.release(new ReleaseRequest(null, "dev1"), "AK", "SK");
-
-        assertTrue(resp.released());
-        assertEquals("dev1", resp.devStageId());
-        verify(devStation).close("dev1", "CLI", "AK", "SK");
-        verify(devStation).delete("dev1", "CLI", "AK", "SK");
-    }
-
-    @Test
-    void releaseIsIdempotentWhenEnvAlreadyGone() {
-        when(devStation.statusOf("dev1", "AK", "SK")).thenReturn(null);
-
-        ReleaseResponse resp = service.release(new ReleaseRequest(null, "dev1"), "AK", "SK");
-
-        assertTrue(resp.released());
-        verify(devStation, never()).close(any(), any(), any(), any());
-        verify(devStation, never()).delete(any(), any(), any(), any());
-    }
-
-    @Test
-    void releaseFailureThrows() {
-        when(devStation.statusOf("dev1", "AK", "SK")).thenReturn("cde.0002");
-        doThrow(new DevStationClient.DevStationException("close failed", null))
-                .when(devStation).close("dev1", "CLI", "AK", "SK");
-
-        SandboxService.HdkitException ex = assertThrows(SandboxService.HdkitException.class,
-                () -> service.release(new ReleaseRequest(null, "dev1"), "AK", "SK"));
-        assertEquals("HDKIT_RELEASE_FAILED", ex.code());
-    }
-
-    @Test
-    void releaseMissingIdsThrows() {
-        SandboxService.HdkitException ex = assertThrows(SandboxService.HdkitException.class,
-                () -> service.release(new ReleaseRequest(null, null), "AK", "SK"));
         assertEquals("HDKIT_INVALID_REQUEST", ex.code());
     }
 
