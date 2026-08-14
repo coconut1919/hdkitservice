@@ -9,10 +9,12 @@ import com.huaweicloud.hdkitservice.model.CredentialsResponse;
 import com.huaweicloud.hdkitservice.model.SignAgreementResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 
@@ -130,10 +132,11 @@ public class SandboxService {
     }
 
     public CheckUserResponse checkUser(String ak, String sk) {
+        Map<String, String> mdc = MDC.getCopyOfContextMap();
         CompletableFuture<Boolean> realnameFuture = CompletableFuture.supplyAsync(
-                () -> "2".equals(devStation.realNameStatus(ak, sk)));
+                () -> withMdc(mdc, () -> "2".equals(devStation.realNameStatus(ak, sk))));
         CompletableFuture<Boolean> agreementFuture = CompletableFuture.supplyAsync(
-                () -> allAgreementsSigned(devStation.agreements(ak, sk)));
+                () -> withMdc(mdc, () -> allAgreementsSigned(devStation.agreements(ak, sk))));
 
         boolean realnameOk = await(realnameFuture, "查询实名状态失败");
         boolean agreementOk = await(agreementFuture, "查询协议状态失败");
@@ -141,6 +144,17 @@ public class SandboxService {
         if (!realnameOk) throw new HdkitException("HDKIT_NOT_REALNAME", "用户未完成实名认证", null);
         if (!agreementOk) throw new HdkitException("HDKIT_NOT_AGREEMENT", "用户未签署协议", null);
         return new CheckUserResponse(true, true);
+    }
+
+    private static <T> T withMdc(Map<String, String> mdc, java.util.function.Supplier<T> supplier) {
+        if (mdc != null) {
+            MDC.setContextMap(mdc);
+        }
+        try {
+            return supplier.get();
+        } finally {
+            MDC.clear();
+        }
     }
 
     public SignAgreementResponse signAgreement(String ak, String sk) {
