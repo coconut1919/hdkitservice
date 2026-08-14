@@ -1,0 +1,55 @@
+name: CD Production
+
+on:
+  push:
+    branches: [main]
+
+env:
+  REGISTRY: swr.cn-south-1.myhuaweicloud.com
+  IMAGE: huaweicloud-devkit-prod/hdkitservice
+  NAMESPACE: backend
+  CLUSTER: cce-hd-devkit-prod
+  WORKLOAD: hdkitservice
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Build & Test
+        run: mvn -B package
+
+      - name: Login SWR
+        env:
+          SWR_USER: ${{ secrets.SWR_USER }}
+          SWR_PASSWORD: ${{ secrets.SWR_PASSWORD }}
+        run: echo "$SWR_PASSWORD" | docker login -u "$SWR_USER" --password-stdin $REGISTRY
+
+      - name: Build & Push image
+        run: |
+          TAG=$(date +%Y%m%d%H%M%S)
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+          docker build -t $REGISTRY/$IMAGE:$TAG .
+          docker push $REGISTRY/$IMAGE:$TAG
+
+      - name: Deploy to CCE (${{ env.CLUSTER }})
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.BUILD_HOST }}
+          username: ${{ secrets.BUILD_USER }}
+          password: ${{ secrets.BUILD_PASSWORD }}
+          script: |
+            kubectl --kubeconfig=/tmp/kubeconfig.json -n ${{ env.NAMESPACE }} \
+              set image deployment/${{ env.WORKLOAD }} \
+              server=${{ env.REGISTRY }}/${{ env.IMAGE }}:$TAG
+            kubectl --kubeconfig=/tmp/kubeconfig.json -n ${{ env.NAMESPACE }} \
+              rollout status deployment/${{ env.WORKLOAD }} --timeout=120s
