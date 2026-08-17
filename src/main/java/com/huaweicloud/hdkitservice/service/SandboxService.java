@@ -159,7 +159,7 @@ public class SandboxService {
         boolean agreementOk = await(agreementFuture, "查询协议状态失败");
 
         if (!realnameOk) throw new HdkitException("HDKIT_NOT_REALNAME", "用户未完成实名认证", null);
-        if (!agreementOk) throw new HdkitException("HDKIT_NOT_AGREEMENT", "用户未签署协议", null);
+        if (!agreementOk) throw new HdkitException("HDKIT_NOT_AGREEMENT", "用户未签署最新版协议，请先调用 sign-agreement", null);
         return new CheckUserResponse(true, true);
     }
 
