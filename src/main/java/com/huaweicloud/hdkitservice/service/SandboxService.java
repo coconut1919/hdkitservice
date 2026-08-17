@@ -39,27 +39,32 @@ public class SandboxService {
         String flavorId = (req.flavorId() == null || req.flavorId().isEmpty())
                 ? config.flavorId() : req.flavorId();
 
-        List<DevStationClient.Devenv> actual = devStation.list("", ak, sk);
-
-        DevStationClient.Devenv existing = findHcdkInstance(actual);
-        String devStageId;
         boolean created = false;
-
-        if (existing != null) {
-            // 复用已有实例
-            devStageId = existing.id();
-        } else {
-            // 按账号实时计数：云上现存环境数（含手动创建的）达到上限则拒绝
-            if (actual.size() >= config.maxConcurrent()) {
-                throw new HdkitException("HDKIT_CONFLICT", "已达最大并发沙箱数 " + config.maxConcurrent(), null);
-            }
-            // 新建实例（name 内部生成，保证唯一可识别）
-            String name = "hcdk" + Long.toString(System.currentTimeMillis(), 36);
-            devStageId = devStation.create(name, templateId, flavorId, req.source(), req.env(), req.git(), ak, sk);
-            created = true;
-        }
-
+        String devStageId = null;
         try {
+            // 协议门禁：协议非最新版（sign_status==2 已签旧版）也视为未签署，
+            // 否则上游 /open-api-public/v2/devenvs 会以 HD.83700031 拒绝，且异常被兜底打成 500 内部错误。
+            if (!allAgreementsSigned(devStation.agreements(ak, sk))) {
+                throw new HdkitException("HDKIT_NOT_AGREEMENT", "用户未签署最新版协议，请先调用 sign-agreement", null);
+            }
+
+            List<DevStationClient.Devenv> actual = devStation.list("", ak, sk);
+            DevStationClient.Devenv existing = findHcdkInstance(actual);
+
+            if (existing != null) {
+                // 复用已有实例
+                devStageId = existing.id();
+            } else {
+                // 按账号实时计数：云上现存环境数（含手动创建的）达到上限则拒绝
+                if (actual.size() >= config.maxConcurrent()) {
+                    throw new HdkitException("HDKIT_CONFLICT", "已达最大并发沙箱数 " + config.maxConcurrent(), null);
+                }
+                // 新建实例（name 内部生成，保证唯一可识别）
+                String name = "hcdk" + Long.toString(System.currentTimeMillis(), 36);
+                devStageId = devStation.create(name, templateId, flavorId, req.source(), req.env(), req.git(), ak, sk);
+                created = true;
+            }
+
             if (created) {
                 waitForStatus(devStageId, STATUS_READY, config.connectTimeout(), ak, sk);
             }
@@ -73,6 +78,18 @@ public class SandboxService {
 
             // 无本地会话：session_id 等价 dev_stage_id
             return new ConnectResponse(devStageId, devStageId, String.valueOf(connectionId), address, "connected");
+        } catch (HdkitException e) {
+            // 业务异常原样抛出（HDKIT_NOT_AGREEMENT / HDKIT_CONFLICT），不被吞成通用错误
+            throw e;
+        } catch (DevStationClient.DevStationException e) {
+            // 上游/编排失败：暴露真实原因，避免被打成 500 内部错误
+            log.error("[connect] upstream failed: {}", e.getMessage());
+            if (created) {
+                try { releaseById(devStageId, ak, sk); } catch (Exception ex) {
+                    log.error("[connect] rollback release failed: {}", ex.getMessage());
+                }
+            }
+            throw new HdkitException("HDKIT_UPSTREAM_ERROR", "沙箱编排上游调用失败: " + e.getMessage(), e);
         } catch (Exception e) {
             log.error("[connect] failed: {}", e.getMessage());
             if (created) {
@@ -174,7 +191,9 @@ public class SandboxService {
     private boolean allAgreementsSigned(List<DevStationClient.Agreement> agreements) {
         if (agreements.isEmpty()) return false;
         for (DevStationClient.Agreement a : agreements) {
-            if (a.signStatus() != 1 && a.signStatus() != 2) return false;
+            // 仅最新版（sign_status==1）视为已签署；
+            // sign_status==2 表示已签旧版，DevStation 上游会拒绝所有请求，必须补签
+            if (a.signStatus() != 1) return false;
         }
         return true;
     }

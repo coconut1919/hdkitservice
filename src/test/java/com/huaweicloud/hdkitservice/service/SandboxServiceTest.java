@@ -44,6 +44,12 @@ class SandboxServiceTest {
         config.setReleaseTimeout(1000);
         config.setMaxConcurrent(5);
         service = new SandboxService(devStation, config);
+        // connect 前置协议门禁：默认已签最新版协议
+        when(devStation.agreements("AK", "SK")).thenReturn(signedAgreements());
+    }
+
+    private static List<DevStationClient.Agreement> signedAgreements() {
+        return List.of(new DevStationClient.Agreement("90102", "cn", "zh_cn", 1, 2025062315L));
     }
 
     // ── connect: 新建实例 ──
@@ -208,10 +214,37 @@ class SandboxServiceTest {
 
         SandboxService.HdkitException ex = assertThrows(SandboxService.HdkitException.class,
                 () -> service.connect(new ConnectRequest(null, null, null, null, Map.of(), Map.of()), "AK", "SK"));
-        assertEquals("HDKIT_CONNECT_FAILED", ex.code());
+        assertEquals("HDKIT_UPSTREAM_ERROR", ex.code());
         // 复用实例失败不应释放用户已有沙箱
         verify(devStation, never()).close(any(), any(), any(), any());
         verify(devStation, never()).delete(any(), any(), any(), any());
+    }
+
+    // ── connect: 协议门禁 & 上游错误映射 ──
+
+    @Test
+    void connectOutdatedAgreementThrowsNotAgreement() {
+        when(devStation.agreements("AK", "SK"))
+                .thenReturn(List.of(new DevStationClient.Agreement("90142", "cn", "zh_cn", 2, 2026081706L)));
+
+        SandboxService.HdkitException ex = assertThrows(SandboxService.HdkitException.class,
+                () -> service.connect(new ConnectRequest(null, null, null, null, Map.of(), Map.of()), "AK", "SK"));
+        assertEquals("HDKIT_NOT_AGREEMENT", ex.code());
+        // 协议不过关时不应触碰实例创建
+        verify(devStation, never()).list(any(), any(), any());
+        verify(devStation, never()).create(any(), any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void connectUpstreamListErrorThrowsUpstreamError() {
+        doThrow(new DevStationClient.DevStationException("GET /open-api-public/v2/devenvs upstream error "
+                + "HD.83700031: the account not sign agreement", null))
+                .when(devStation).list("", "AK", "SK");
+
+        SandboxService.HdkitException ex = assertThrows(SandboxService.HdkitException.class,
+                () -> service.connect(new ConnectRequest(null, null, null, null, Map.of(), Map.of()), "AK", "SK"));
+        assertEquals("HDKIT_UPSTREAM_ERROR", ex.code());
+        assertTrue(ex.getMessage().contains("HD.83700031"));
     }
 
     // ── credentials ──
@@ -298,6 +331,17 @@ class SandboxServiceTest {
         when(devStation.realNameStatus("AK", "SK")).thenReturn("2");
         when(devStation.agreements("AK", "SK"))
                 .thenReturn(List.of(new DevStationClient.Agreement("90102", "cn", "zh_cn", 3, 2025062315L)));
+
+        SandboxService.HdkitException ex = assertThrows(SandboxService.HdkitException.class,
+                () -> service.checkUser("AK", "SK"));
+        assertEquals("HDKIT_NOT_AGREEMENT", ex.code());
+    }
+
+    @Test
+    void checkUserOutdatedAgreementThrows() {
+        when(devStation.realNameStatus("AK", "SK")).thenReturn("2");
+        when(devStation.agreements("AK", "SK"))
+                .thenReturn(List.of(new DevStationClient.Agreement("90142", "cn", "zh_cn", 2, 2026081706L)));
 
         SandboxService.HdkitException ex = assertThrows(SandboxService.HdkitException.class,
                 () -> service.checkUser("AK", "SK"));
