@@ -74,17 +74,23 @@ curl -X POST http://<host>:<port>/rest/developer/server/hdkitservice/credentials
 ### 错误响应
 
 ```json
-{ "code": "HDKIT_CONNECT_TIMEOUT", "message": "开机超时", "trace_id": "req_3f2a..." }
+{ "code": "HDKIT_NOT_AGREEMENT", "message": "用户未签署最新版协议，请先调用 sign-agreement", "traceId": "c1200227-..." }
 ```
+
+> 错误响应固定字段为 `code` / `message` / `traceId`（注意 `traceId` 是驼峰）。
 
 | HTTP | 业务码 | 说明 |
 |------|--------|------|
 | 400 | `HDKIT_INVALID_REQUEST` | 参数缺失/非法 |
+| 403 | `HDKIT_NOT_REALNAME` | 未完成实名认证 |
+| 403 | `HDKIT_NOT_AGREEMENT` | 未签署协议，或协议非最新版（`sign_status==2`）——`connect` 也会做此门禁 |
 | 404 | `HDKIT_SANDBOX_NOT_FOUND` | 环境不存在或已被删除 |
-| 409 | `HDKIT_CONFLICT` | 并发冲突/已存在 |
+| 409 | `HDKIT_CONFLICT` | 并发冲突/已达沙箱上限 |
 | 422 | `HDKIT_NOT_RUNNING` | 环境未处于 RUNNING，无法注入 AK/SK |
-| 502 | `HDKIT_UPSTREAM_ERROR` / `HDKIT_CONNECT_FAILED` / `HDKIT_RELEASE_FAILED` | 上游/编排失败 |
+| 502 | `HDKIT_UPSTREAM_ERROR` / `HDKIT_CONNECT_FAILED` / `HDKIT_RELEASE_FAILED` | 上游/编排失败（`HDKIT_UPSTREAM_ERROR` 会附带真实上游原因） |
 | 504 | `HDKIT_TIMEOUT` / `HDKIT_RELEASE_TIMEOUT` | 编排超时 |
+
+> **协议门禁（connect 前置校验）**：上游 DevStation 对协议非最新版的账号会拒绝**所有**请求（`HD.83700031`）。因此 `connect` 在编排前同步校验协议状态，非最新版直接返回 `403 HDKIT_NOT_AGREEMENT`，避免被打成 500 内部错误。
 
 ## 快速开始
 
@@ -124,7 +130,7 @@ java -jar target/hdkitservice-0.0.1.jar
 
 | hdkitservice 接口 | 内部下游调用 |
 |-------------------|--------------|
-| `/connect` | ① `POST /open-api-public/v2/devenvs` ② 轮询列表至 `cde.0004` ③ `POST /open-api-public/v1/devenvs/{id}/start` ④ 轮询至 `cde.0002` ⑤ `POST .../connections` ⑥ `GET .../connections/{connId}` |
+| `/connect` | ⓪ `GET /open-api-public/v1/agreements`（协议门禁）① `GET /open-api-public/v2/devenvs`（找已有/并发计数）② `POST /open-api-public/v2/devenvs`（新建）③ 轮询至 `cde.0004` ④ `POST /open-api-public/v1/devenvs/{id}/start` ⑤ 轮询至 `cde.0002` ⑥ `POST /open-api-public/v1/auto-config`（注入临时 AK/SK）⑦ `POST /open-api-public/v1/devenvs/{id}/connections` ⑧ `GET /open-api-public/v1/devenvs/{id}/connections/{connId}` |
 | `/credentials` | ① 轮询确认 `cde.0002` ② `POST /open-api-public/v1/auto-config` |
 
 关键字段（已实测）：创建返回 `result.dev_stage_instance_id`；连接地址 `result.connection_info.url`；临时凭证过期 `result.sts_expires_at`。状态码 `cde.0002`=RUNNING、`cde.0004`=已就绪/关机。**删除前必须先关机完成**，否则报 `HD.98320063`。
