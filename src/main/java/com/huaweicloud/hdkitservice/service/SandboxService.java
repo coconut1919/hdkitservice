@@ -45,7 +45,7 @@ public class SandboxService {
             // 协议门禁：协议非最新版（sign_status==2 已签旧版）也视为未签署，
             // 否则上游 /open-api-public/v2/devenvs 会以 HD.83700031 拒绝，且异常被兜底打成 500 内部错误。
             if (!allAgreementsSigned(devStation.agreements(ak, sk))) {
-                throw new HdkitException("HDKIT_NOT_AGREEMENT", "用户未签署最新版协议，请先调用 sign-agreement", null);
+                throw new HdkitException("HDKIT_NOT_AGREEMENT", "用户未签署最新版协议，签署需由用户本人确认后完成", null);
             }
 
             List<DevStationClient.Devenv> actual = devStation.list("", ak, sk);
@@ -159,7 +159,7 @@ public class SandboxService {
         boolean agreementOk = await(agreementFuture, "查询协议状态失败");
 
         if (!realnameOk) throw new HdkitException("HDKIT_NOT_REALNAME", "用户未完成实名认证", null);
-        if (!agreementOk) throw new HdkitException("HDKIT_NOT_AGREEMENT", "用户未签署最新版协议，请先调用 sign-agreement", null);
+        if (!agreementOk) throw new HdkitException("HDKIT_NOT_AGREEMENT", "用户未签署最新版协议，签署需由用户本人确认后完成", null);
         return new CheckUserResponse(true, true);
     }
 

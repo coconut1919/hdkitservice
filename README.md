@@ -74,7 +74,7 @@ curl -X POST http://<host>:<port>/rest/developer/server/hdkitservice/credentials
 ### 错误响应
 
 ```json
-{ "code": "HDKIT_NOT_AGREEMENT", "message": "用户未签署最新版协议，请先调用 sign-agreement", "traceId": "c1200227-..." }
+{ "code": "HDKIT_NOT_AGREEMENT", "message": "用户未签署最新版协议，签署需由用户本人确认后完成", "traceId": "c1200227-..." }
 ```
 
 > 错误响应固定字段为 `code` / `message` / `traceId`（注意 `traceId` 是驼峰）。
