@@ -23,6 +23,7 @@ public class GlobalExceptionHandler {
             Map.entry("HDKIT_NOT_RUNNING", HttpStatus.UNPROCESSABLE_ENTITY),
             Map.entry("HDKIT_CONFLICT", HttpStatus.CONFLICT),
             Map.entry("HDKIT_NOT_REALNAME", HttpStatus.FORBIDDEN),
+            Map.entry("HDKIT_NOT_REALNAME_AND_AGREEMENT", HttpStatus.FORBIDDEN),
             Map.entry("HDKIT_NOT_AGREEMENT", HttpStatus.FORBIDDEN),
             Map.entry("HDKIT_SANDBOX_NOT_FOUND", HttpStatus.NOT_FOUND),
             Map.entry("HDKIT_TIMEOUT", HttpStatus.GATEWAY_TIMEOUT),

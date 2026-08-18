@@ -158,8 +158,20 @@ public class SandboxService {
         boolean realnameOk = await(realnameFuture, "查询实名状态失败");
         boolean agreementOk = await(agreementFuture, "查询协议状态失败");
 
-        // 实名与协议同时判定并全部返回：用户可一次看到两项缺失，分别完成
-        return new CheckUserResponse(realnameOk, agreementOk);
+        // 实名与协议并行判定，按缺失情况返回对应 403，方便调用方分别引导用户
+        if (!realnameOk && !agreementOk) {
+            throw new HdkitException("HDKIT_NOT_REALNAME_AND_AGREEMENT",
+                    "用户未完成实名认证且未签署最新版协议，请分别完成实名认证与协议签署", null);
+        }
+        if (!realnameOk) {
+            throw new HdkitException("HDKIT_NOT_REALNAME",
+                    "用户未完成实名认证，请在华为云控制台完成实名认证", null);
+        }
+        if (!agreementOk) {
+            throw new HdkitException("HDKIT_NOT_AGREEMENT",
+                    "用户未签署最新版协议，签署需由用户本人确认后完成", null);
+        }
+        return new CheckUserResponse(true, true);
     }
 
     private static <T> T withMdc(Map<String, String> mdc, java.util.function.Supplier<T> supplier) {

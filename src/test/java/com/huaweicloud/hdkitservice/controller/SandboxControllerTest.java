@@ -96,27 +96,26 @@ class SandboxControllerTest {
     }
 
     @Test
-    void checkUserNotRealnameReturnsFalse() throws Exception {
+    void checkUserNotRealnameMappedTo403() throws Exception {
         when(service.checkUser(eq("AK"), eq("SK")))
-                .thenReturn(new CheckUserResponse(false, true));
+                .thenThrow(new SandboxService.HdkitException("HDKIT_NOT_REALNAME", "用户未完成实名认证", null));
 
         mvc.perform(get("/rest/developer/server/hdkitservice/check-user")
                         .header("X-HW-AK", "AK").header("X-HW-SK", "SK"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.realnameVerified").value(false))
-                .andExpect(jsonPath("$.agreementSigned").value(true));
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("HDKIT_NOT_REALNAME"));
     }
 
     @Test
-    void checkUserBothMissingReturnsBothFalse() throws Exception {
+    void checkUserBothMissingMappedTo403CombinedCode() throws Exception {
         when(service.checkUser(eq("AK"), eq("SK")))
-                .thenReturn(new CheckUserResponse(false, false));
+                .thenThrow(new SandboxService.HdkitException(
+                        "HDKIT_NOT_REALNAME_AND_AGREEMENT", "用户未完成实名认证且未签署最新版协议", null));
 
         mvc.perform(get("/rest/developer/server/hdkitservice/check-user")
                         .header("X-HW-AK", "AK").header("X-HW-SK", "SK"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.realnameVerified").value(false))
-                .andExpect(jsonPath("$.agreementSigned").value(false));
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("HDKIT_NOT_REALNAME_AND_AGREEMENT"));
     }
 
     @Test
