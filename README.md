@@ -82,8 +82,7 @@ curl -X POST http://<host>:<port>/rest/developer/server/hdkitservice/credentials
 | HTTP | 业务码 | 说明 |
 |------|--------|------|
 | 400 | `HDKIT_INVALID_REQUEST` | 参数缺失/非法 |
-| 403 | `HDKIT_NOT_REALNAME` | 未完成实名认证 |
-| 403 | `HDKIT_NOT_AGREEMENT` | 未签署协议，或协议非最新版（`sign_status==2`）——`connect` 也会做此门禁 |
+| 403 | `HDKIT_NOT_AGREEMENT` | `connect` 门禁：未签署最新版协议（`sign_status==2` 也算），签署需用户本人确认 |
 | 404 | `HDKIT_SANDBOX_NOT_FOUND` | 环境不存在或已被删除 |
 | 409 | `HDKIT_CONFLICT` | 并发冲突/已达沙箱上限 |
 | 422 | `HDKIT_NOT_RUNNING` | 环境未处于 RUNNING，无法注入 AK/SK |
@@ -91,6 +90,8 @@ curl -X POST http://<host>:<port>/rest/developer/server/hdkitservice/credentials
 | 504 | `HDKIT_TIMEOUT` / `HDKIT_RELEASE_TIMEOUT` | 编排超时 |
 
 > **协议门禁（connect 前置校验）**：上游 DevStation 对协议非最新版的账号会拒绝**所有**请求（`HD.83700031`）。因此 `connect` 在编排前同步校验协议状态，非最新版直接返回 `403 HDKIT_NOT_AGREEMENT`，避免被打成 500 内部错误。
+>
+> **check-user 不再返回 403**：实名与协议**并行查询、同时返回** 200 `{"realnameVerified":boolean,"agreementSigned":boolean}`，两项缺失可一次看到、分别完成。
 
 ## 快速开始
 

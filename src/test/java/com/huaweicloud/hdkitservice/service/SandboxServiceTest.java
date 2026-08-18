@@ -316,14 +316,39 @@ class SandboxServiceTest {
     }
 
     @Test
-    void checkUserNotRealnameThrows() {
+    void checkUserNotRealnameReturnsFalse() {
         when(devStation.realNameStatus("AK", "SK")).thenReturn("0");
         when(devStation.agreements("AK", "SK"))
                 .thenReturn(List.of(new DevStationClient.Agreement("90102", "cn", "zh_cn", 1, 2025062315L)));
 
-        SandboxService.HdkitException ex = assertThrows(SandboxService.HdkitException.class,
-                () -> service.checkUser("AK", "SK"));
-        assertEquals("HDKIT_NOT_REALNAME", ex.code());
+        CheckUserResponse resp = service.checkUser("AK", "SK");
+
+        assertTrue(!resp.realnameVerified());
+        assertTrue(resp.agreementSigned());
+    }
+
+    @Test
+    void checkUserNotAgreementReturnsFalse() {
+        when(devStation.realNameStatus("AK", "SK")).thenReturn("2");
+        when(devStation.agreements("AK", "SK"))
+                .thenReturn(List.of(new DevStationClient.Agreement("90102", "cn", "zh_cn", 3, 2025062315L)));
+
+        CheckUserResponse resp = service.checkUser("AK", "SK");
+
+        assertTrue(resp.realnameVerified());
+        assertTrue(!resp.agreementSigned());
+    }
+
+    @Test
+    void checkUserBothMissingReturnsBothFalse() {
+        when(devStation.realNameStatus("AK", "SK")).thenReturn("0");
+        when(devStation.agreements("AK", "SK"))
+                .thenReturn(List.of(new DevStationClient.Agreement("90142", "cn", "zh_cn", 2, 2026081706L)));
+
+        CheckUserResponse resp = service.checkUser("AK", "SK");
+
+        assertTrue(!resp.realnameVerified());
+        assertTrue(!resp.agreementSigned());
     }
 
     @Test
@@ -332,20 +357,22 @@ class SandboxServiceTest {
         when(devStation.agreements("AK", "SK"))
                 .thenReturn(List.of(new DevStationClient.Agreement("90102", "cn", "zh_cn", 3, 2025062315L)));
 
-        SandboxService.HdkitException ex = assertThrows(SandboxService.HdkitException.class,
-                () -> service.checkUser("AK", "SK"));
-        assertEquals("HDKIT_NOT_AGREEMENT", ex.code());
+        CheckUserResponse resp = service.checkUser("AK", "SK");
+
+        assertTrue(resp.realnameVerified());
+        assertTrue(!resp.agreementSigned());
     }
 
     @Test
-    void checkUserOutdatedAgreementThrows() {
+    void checkUserOutdatedAgreementReturnsFalse() {
         when(devStation.realNameStatus("AK", "SK")).thenReturn("2");
         when(devStation.agreements("AK", "SK"))
                 .thenReturn(List.of(new DevStationClient.Agreement("90142", "cn", "zh_cn", 2, 2026081706L)));
 
-        SandboxService.HdkitException ex = assertThrows(SandboxService.HdkitException.class,
-                () -> service.checkUser("AK", "SK"));
-        assertEquals("HDKIT_NOT_AGREEMENT", ex.code());
+        CheckUserResponse resp = service.checkUser("AK", "SK");
+
+        assertTrue(resp.realnameVerified());
+        assertTrue(!resp.agreementSigned());
     }
 
     @Test
