@@ -52,3 +52,11 @@ RUN curl -fsSL -o /tmp/openagent.zip \
     && install -m 0755 /tmp/openagent/release/arm/cli /usr/local/bin/openagent-cli \
     && rm -rf /tmp/openagent /tmp/openagent.zip \
     && openagent-cli --version
+
+RUN dnf install -y nginx net-tools \
+    && dnf clean all \
+    && nginx -v
+
+RUN corepack enable \
+    && corepack prepare pnpm@9 --activate \
+    && pnpm --version
