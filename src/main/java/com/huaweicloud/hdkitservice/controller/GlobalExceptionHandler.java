@@ -1,6 +1,7 @@
 package com.huaweicloud.hdkitservice.controller;
 
 import com.huaweicloud.hdkitservice.model.ErrorResponse;
+import com.huaweicloud.hdkitservice.service.IncentiveClient;
 import com.huaweicloud.hdkitservice.service.SandboxService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,16 +29,20 @@ public class GlobalExceptionHandler {
             Map.entry("HDKIT_SANDBOX_NOT_FOUND", HttpStatus.NOT_FOUND),
             Map.entry("HDKIT_TIMEOUT", HttpStatus.GATEWAY_TIMEOUT),
             Map.entry("HDKIT_RELEASE_TIMEOUT", HttpStatus.GATEWAY_TIMEOUT),
+            Map.entry("HDKIT_IAM_ERROR", HttpStatus.BAD_GATEWAY),
+            Map.entry("HDKIT_INCENTIVE_ERROR", HttpStatus.BAD_GATEWAY),
             Map.entry("HDKIT_UPSTREAM_ERROR", HttpStatus.BAD_GATEWAY),
             Map.entry("HDKIT_CONNECT_FAILED", HttpStatus.BAD_GATEWAY),
             Map.entry("HDKIT_RELEASE_FAILED", HttpStatus.BAD_GATEWAY));
 
-    @ExceptionHandler(SandboxService.HdkitException.class)
-    public ResponseEntity<ErrorResponse> handle(SandboxService.HdkitException e) {
-        log.error("[error] {}: {}", e.code(), e.getMessage());
-        HttpStatus status = STATUS_MAP.getOrDefault(e.code(), HttpStatus.INTERNAL_SERVER_ERROR);
+    @ExceptionHandler({SandboxService.HdkitException.class, IncentiveClient.IncentiveException.class})
+    public ResponseEntity<ErrorResponse> handle(RuntimeException e) {
+        String code = e instanceof SandboxService.HdkitException h ? h.code()
+                : ((IncentiveClient.IncentiveException) e).code();
+        log.error("[error] {}: {}", code, e.getMessage());
+        HttpStatus status = STATUS_MAP.getOrDefault(code, HttpStatus.INTERNAL_SERVER_ERROR);
         return ResponseEntity.status(status)
-                .body(new ErrorResponse(e.code(), e.getMessage(), traceId()));
+                .body(new ErrorResponse(code, e.getMessage(), traceId()));
     }
 
     @ExceptionHandler(MissingRequestHeaderException.class)

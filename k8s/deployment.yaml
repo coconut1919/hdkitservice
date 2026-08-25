@@ -67,6 +67,41 @@ spec:
                 secretKeyRef:
                   name: app-secrets
                   key: FLAVOR_ID
+            - name: INCENTIVE_CHECK_URL
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: INCENTIVE_CHECK_URL
+            - name: INCENTIVE_ISSUE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: INCENTIVE_ISSUE_URL
+            - name: INCENTIVE_APPCODE
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: INCENTIVE_APPCODE
+            - name: INCENTIVE_HW_ID
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: INCENTIVE_HW_ID
+            - name: INCENTIVE_APPKEY
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: INCENTIVE_APPKEY
+            - name: INCENTIVE_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: INCENTIVE_AUTH_TOKEN
+            - name: INCENTIVE_FACE_AMOUNT
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: INCENTIVE_FACE_AMOUNT
           resources:
             requests:
               cpu: 500m
