@@ -106,7 +106,11 @@ public class IncentiveClient {
     // ── 激励 API: 发券 ──
 
     public IssueResult issueCoupon(String domainId) {
-        int faceAmount = Math.min(config.incentiveFaceAmount(), 500);
+        int rawAmount = config.incentiveFaceAmount();
+        if (rawAmount <= 0) {
+            throw new IncentiveException("HDKIT_INCENTIVE_ERROR", "代金券面额未配置", null);
+        }
+        int faceAmount = Math.min(rawAmount, 500);
         String body = buildJson(ob -> {
             ob.put("customer_id", domainId);
             ob.put("activity_id", config.incentiveActivityId());
