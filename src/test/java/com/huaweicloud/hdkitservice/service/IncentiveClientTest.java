@@ -180,4 +180,16 @@ class IncentiveClientTest {
         assertTrue(result.success());
         assertEquals("c456", result.couponId());
     }
+
+    @Test
+    void issueCouponThrowsWhenFaceAmountNotConfigured() {
+        config.setIncentiveFaceAmount(0);
+        IncentiveClient clientZero = new IncentiveClient(config, mapper, new Masker(config),
+                RestClient.builder());
+
+        var ex = assertThrows(IncentiveClient.IncentiveException.class,
+                () -> clientZero.issueCoupon("domain123"));
+        assertEquals("HDKIT_INCENTIVE_ERROR", ex.code());
+        assertEquals("代金券面额未配置", ex.getMessage());
+    }
 }

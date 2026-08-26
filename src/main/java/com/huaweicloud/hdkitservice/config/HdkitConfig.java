@@ -58,7 +58,7 @@ public class HdkitConfig {
     @Value("${INCENTIVE_AUTH_TOKEN:}")
     private String incentiveAuthToken;
 
-    @Value("${INCENTIVE_FACE_AMOUNT:500}")
+    @Value("${INCENTIVE_FACE_AMOUNT:0}")
     private int incentiveFaceAmount;
 
     @Value("${INCENTIVE_ACTIVITY_ID:}")
