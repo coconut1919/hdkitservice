@@ -58,10 +58,10 @@ public class HdkitConfig {
     @Value("${INCENTIVE_FACE_AMOUNT:500}")
     private int incentiveFaceAmount;
 
-    @Value("${INCENTIVE_ACTIVITY_ID:A000330}")
+    @Value("${INCENTIVE_ACTIVITY_ID:}")
     private String incentiveActivityId;
 
-    @Value("${INCENTIVE_ACTIVITY_PRODUCT_ID:5649bf1d2bc74d648ac6cd5496ebba91}")
+    @Value("${INCENTIVE_ACTIVITY_PRODUCT_ID:}")
     private String incentiveActivityProductId;
 
     @Value("${INCENTIVE_CURRENCY:CNY}")
