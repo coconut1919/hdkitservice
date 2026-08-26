@@ -169,9 +169,8 @@ public class IncentiveClient {
     }
 
     private String getAuthToken() {
-        String token = config.incentiveAuthToken();
-        if (token != null && !token.isEmpty()) {
-            return token;
+        if ("test".equalsIgnoreCase(config.deployEnv())) {
+            return config.incentiveAuthToken();
         }
         if (cachedIamToken != null && System.currentTimeMillis() < cachedIamTokenExpiry - 600000) {
             return cachedIamToken;

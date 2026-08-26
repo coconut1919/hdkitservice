@@ -30,6 +30,7 @@ class IncentiveClientTest {
     @BeforeEach
     void setUp() {
         config = new HdkitConfig();
+        config.setDeployEnv("test");
         config.setIamDomainsEndpoint("https://iam.myhuaweicloud.com");
         config.setIncentiveCheckUrl("https://incentive.example.com/check");
         config.setIncentiveIssueUrl("https://incentive.example.com/issue");
