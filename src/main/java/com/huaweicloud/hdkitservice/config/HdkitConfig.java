@@ -36,6 +36,9 @@ public class HdkitConfig {
     @Value("${LOG_MASK_KEYS:password,passwd,pwd,secret,token,sk,access_key,private_key,authorization,cookie,credential}")
     private String maskKeys;
 
+    @Value("${DEPLOY_ENV:production}")
+    private String deployEnv;
+
     // ── 激励金服务 ──
     @Value("${INCENTIVE_CHECK_URL:}")
     private String incentiveCheckUrl;
@@ -114,6 +117,8 @@ public class HdkitConfig {
     public void setReleaseTimeout(long releaseTimeout) { this.releaseTimeout = releaseTimeout; }
     public void setMaxConcurrent(int maxConcurrent) { this.maxConcurrent = maxConcurrent; }
     public void setMaskKeys(String maskKeys) { this.maskKeys = maskKeys; }
+    public String deployEnv() { return deployEnv; }
+    public void setDeployEnv(String v) { this.deployEnv = v; }
 
     public String incentiveCheckUrl() { return incentiveCheckUrl; }
     public String incentiveIssueUrl() { return incentiveIssueUrl; }
