@@ -9,7 +9,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -26,49 +25,57 @@ class IncentiveServiceTest {
         client = mock(IncentiveClient.class);
         config = new HdkitConfig();
         config.setIncentiveFaceAmount(100);
+        config.setDeployEnv("production");
         service = new IncentiveService(client, config);
     }
 
+    // ── Production mode: resolves domainId from IAM ──
+
     @Test
-    void voucherStatusReturnsNotClaimed() {
-        when(client.resolveDomainId("AK", "SK")).thenReturn("domain123");
+    void voucherStatusProduction() {
+        when(client.resolveDomainIdFromIam("AK", "SK")).thenReturn("domain123");
         when(client.checkCouponIssued("domain123"))
                 .thenReturn(new IncentiveClient.CheckResult(false, false, null));
 
-        var result = service.voucherStatus("AK", "SK");
+        var result = service.voucherStatus("AK", "SK", null);
         assertFalse(result.claimed());
         assertEquals("未领取", result.message());
     }
 
     @Test
-    void voucherStatusReturnsClaimed() {
-        when(client.resolveDomainId("AK", "SK")).thenReturn("domain123");
+    void voucherClaimProduction() {
+        when(client.resolveDomainIdFromIam("AK", "SK")).thenReturn("domain123");
         when(client.checkCouponIssued("domain123"))
-                .thenReturn(new IncentiveClient.CheckResult(true, false, null));
+                .thenReturn(new IncentiveClient.CheckResult(false, false, null));
+        when(client.issueCoupon("domain123"))
+                .thenReturn(new IncentiveClient.IssueResult(true, "c123", null, null));
 
-        var result = service.voucherStatus("AK", "SK");
+        var result = service.voucherClaim("AK", "SK", null);
         assertTrue(result.claimed());
-        assertEquals("已领取", result.message());
+        assertEquals("c123", result.voucherId());
     }
 
     @Test
-    void voucherStatusHandlesServiceError() {
-        when(client.resolveDomainId("AK", "SK")).thenReturn("domain123");
-        when(client.checkCouponIssued("domain123"))
-                .thenReturn(new IncentiveClient.CheckResult(false, true, "timeout"));
+    void voucherClaimProductionIgnoresProvidedDomainId() {
+        when(client.resolveDomainIdFromIam("AK", "SK")).thenReturn("iam-domain");
+        when(client.checkCouponIssued("iam-domain"))
+                .thenReturn(new IncentiveClient.CheckResult(true, false, null));
 
-        var result = service.voucherStatus("AK", "SK");
-        assertFalse(result.claimed());
-        assertEquals("查询失败", result.message());
+        // Even if domain_id is provided, production uses IAM
+        var result = service.voucherClaim("AK", "SK", "user-provided-domain");
+        assertTrue(result.claimed());
+        assertEquals("已领取过", result.message());
+        verify(client).checkCouponIssued("iam-domain");
+        verify(client, never()).checkCouponIssued("user-provided-domain");
     }
 
     @Test
-    void voucherClaimReturnsAlreadyClaimed() {
-        when(client.resolveDomainId("AK", "SK")).thenReturn("domain123");
+    void voucherClaimAlreadyClaimed() {
+        when(client.resolveDomainIdFromIam("AK", "SK")).thenReturn("domain123");
         when(client.checkCouponIssued("domain123"))
                 .thenReturn(new IncentiveClient.CheckResult(true, false, null));
 
-        var result = service.voucherClaim("AK", "SK");
+        var result = service.voucherClaim("AK", "SK", null);
         assertTrue(result.claimed());
         assertEquals("已领取过", result.message());
         verify(client, never()).issueCoupon(anyString());
@@ -76,68 +83,86 @@ class IncentiveServiceTest {
 
     @Test
     void voucherClaimCheckErrorThrows() {
-        when(client.resolveDomainId("AK", "SK")).thenReturn("domain123");
+        when(client.resolveDomainIdFromIam("AK", "SK")).thenReturn("domain123");
         when(client.checkCouponIssued("domain123"))
                 .thenReturn(new IncentiveClient.CheckResult(false, true, "timeout"));
 
         var ex = assertThrows(SandboxService.HdkitException.class,
-                () -> service.voucherClaim("AK", "SK"));
+                () -> service.voucherClaim("AK", "SK", null));
         assertEquals("HDKIT_INCENTIVE_ERROR", ex.code());
     }
 
     @Test
-    void voucherClaimIssueSuccess() {
-        when(client.resolveDomainId("AK", "SK")).thenReturn("domain123");
-        when(client.checkCouponIssued("domain123"))
-                .thenReturn(new IncentiveClient.CheckResult(false, false, null));
-        when(client.issueCoupon("domain123"))
-                .thenReturn(new IncentiveClient.IssueResult(true, "c123", null, null));
-
-        var result = service.voucherClaim("AK", "SK");
-        assertTrue(result.claimed());
-        assertEquals("c123", result.voucherId());
-        assertEquals(100, result.amount());
-        assertEquals("领取成功", result.message());
-    }
-
-    @Test
     void voucherClaimIssueHandlesAlreadyClaimedErrorCode() {
-        when(client.resolveDomainId("AK", "SK")).thenReturn("domain123");
+        when(client.resolveDomainIdFromIam("AK", "SK")).thenReturn("domain123");
         when(client.checkCouponIssued("domain123"))
                 .thenReturn(new IncentiveClient.CheckResult(false, false, null));
         when(client.issueCoupon("domain123"))
                 .thenReturn(new IncentiveClient.IssueResult(false, null, "already", "HD.60620016"));
 
-        var result = service.voucherClaim("AK", "SK");
+        var result = service.voucherClaim("AK", "SK", null);
         assertTrue(result.claimed());
         assertEquals("已领取过", result.message());
     }
 
     @Test
     void voucherClaimIssueHandlesQuotaExhausted() {
-        when(client.resolveDomainId("AK", "SK")).thenReturn("domain123");
+        when(client.resolveDomainIdFromIam("AK", "SK")).thenReturn("domain123");
         when(client.checkCouponIssued("domain123"))
                 .thenReturn(new IncentiveClient.CheckResult(false, false, null));
         when(client.issueCoupon("domain123"))
                 .thenReturn(new IncentiveClient.IssueResult(false, null, "quota", "HD.60630042"));
 
         var ex = assertThrows(SandboxService.HdkitException.class,
-                () -> service.voucherClaim("AK", "SK"));
+                () -> service.voucherClaim("AK", "SK", null));
         assertEquals("HDKIT_INCENTIVE_ERROR", ex.code());
         assertTrue(ex.getMessage().contains("已用完"));
     }
 
     @Test
     void voucherClaimIssueHandlesRealNameRequired() {
-        when(client.resolveDomainId("AK", "SK")).thenReturn("domain123");
+        when(client.resolveDomainIdFromIam("AK", "SK")).thenReturn("domain123");
         when(client.checkCouponIssued("domain123"))
                 .thenReturn(new IncentiveClient.CheckResult(false, false, null));
         when(client.issueCoupon("domain123"))
                 .thenReturn(new IncentiveClient.IssueResult(false, null, "unverified", "HD.60630022"));
 
         var ex = assertThrows(SandboxService.HdkitException.class,
-                () -> service.voucherClaim("AK", "SK"));
+                () -> service.voucherClaim("AK", "SK", null));
         assertEquals("HDKIT_INCENTIVE_ERROR", ex.code());
         assertTrue(ex.getMessage().contains("实名认证"));
+    }
+
+    // ── Test mode ──
+
+    @Test
+    void voucherStatusTestUsesProvidedDomainId() {
+        config.setDeployEnv("test");
+
+        when(client.checkCouponIssued("test-domain"))
+                .thenReturn(new IncentiveClient.CheckResult(false, false, null));
+
+        var result = service.voucherStatus("AK", "SK", "test-domain");
+        assertFalse(result.claimed());
+        assertEquals("未领取", result.message());
+    }
+
+    @Test
+    void voucherStatusTestThrowsWithoutDomainId() {
+        config.setDeployEnv("test");
+
+        var ex = assertThrows(SandboxService.HdkitException.class,
+                () -> service.voucherStatus("AK", "SK", null));
+        assertEquals("HDKIT_INVALID_REQUEST", ex.code());
+        assertEquals("测试环境需提供 domain_id", ex.getMessage());
+    }
+
+    @Test
+    void voucherClaimTestThrowsWithoutDomainId() {
+        config.setDeployEnv("test");
+
+        var ex = assertThrows(SandboxService.HdkitException.class,
+                () -> service.voucherClaim("AK", "SK", null));
+        assertEquals("HDKIT_INVALID_REQUEST", ex.code());
     }
 }

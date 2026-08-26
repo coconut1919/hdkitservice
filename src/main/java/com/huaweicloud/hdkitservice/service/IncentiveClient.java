@@ -44,7 +44,7 @@ public class IncentiveClient {
 
     // ── IAM: 获取 domainId ──
 
-    public String resolveDomainId(String ak, String sk) {
+    public String resolveDomainIdFromIam(String ak, String sk) {
         String host = iamDomainsHost();
         Signer.SignResult sr = Signer.sign("GET", "/v3/auth/domains", "", "", ak, sk, host);
         String url = config.iamDomainsEndpoint() + "/v3/auth/domains";

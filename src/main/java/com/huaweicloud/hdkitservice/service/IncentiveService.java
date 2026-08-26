@@ -18,8 +18,19 @@ public class IncentiveService {
         this.config = config;
     }
 
-    public VoucherStatusResult voucherStatus(String ak, String sk) {
-        String domainId = client.resolveDomainId(ak, sk);
+    private String resolveDomainId(String ak, String sk, String providedDomainId) {
+        if (!"test".equalsIgnoreCase(config.deployEnv())) {
+            return client.resolveDomainIdFromIam(ak, sk);
+        }
+        if (providedDomainId == null || providedDomainId.isEmpty()) {
+            throw new SandboxService.HdkitException("HDKIT_INVALID_REQUEST",
+                    "测试环境需提供 domain_id", null);
+        }
+        return providedDomainId;
+    }
+
+    public VoucherStatusResult voucherStatus(String ak, String sk, String providedDomainId) {
+        String domainId = resolveDomainId(ak, sk, providedDomainId);
         IncentiveClient.CheckResult check = client.checkCouponIssued(domainId);
 
         if (check.serviceError()) {
@@ -31,8 +42,8 @@ public class IncentiveService {
         return new VoucherStatusResult(false, "未领取");
     }
 
-    public VoucherClaimResult voucherClaim(String ak, String sk) {
-        String domainId = client.resolveDomainId(ak, sk);
+    public VoucherClaimResult voucherClaim(String ak, String sk, String providedDomainId) {
+        String domainId = resolveDomainId(ak, sk, providedDomainId);
 
         IncentiveClient.CheckResult check = client.checkCouponIssued(domainId);
         if (check.serviceError()) {
