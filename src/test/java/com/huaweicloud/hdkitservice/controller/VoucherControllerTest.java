@@ -7,8 +7,10 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -30,7 +32,7 @@ class VoucherControllerTest {
 
     @Test
     void voucherStatusEndpoint() throws Exception {
-        when(incentiveService.voucherStatus(eq("AK"), eq("SK")))
+        when(incentiveService.voucherStatus(eq("AK"), eq("SK"), any()))
                 .thenReturn(new IncentiveService.VoucherStatusResult(false, "未领取"));
 
         mvc.perform(get("/rest/developer/server/hdkitservice/voucher/status")
@@ -42,7 +44,7 @@ class VoucherControllerTest {
 
     @Test
     void voucherClaimEndpoint() throws Exception {
-        when(incentiveService.voucherClaim(eq("AK"), eq("SK")))
+        when(incentiveService.voucherClaim(eq("AK"), eq("SK"), any()))
                 .thenReturn(new IncentiveService.VoucherClaimResult(true, "v123", 100, "领取成功"));
 
         mvc.perform(post("/rest/developer/server/hdkitservice/voucher/claim")
@@ -54,8 +56,21 @@ class VoucherControllerTest {
     }
 
     @Test
+    void voucherClaimWithDomainId() throws Exception {
+        when(incentiveService.voucherClaim(eq("AK"), eq("SK"), eq("test-domain")))
+                .thenReturn(new IncentiveService.VoucherClaimResult(false, null, 0, "未领取"));
+
+        mvc.perform(post("/rest/developer/server/hdkitservice/voucher/claim")
+                        .header("X-HW-AK", "AK").header("X-HW-SK", "SK")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"domain_id\":\"test-domain\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.claimed").value(false));
+    }
+
+    @Test
     void voucherClaimIncentiveErrorMappedTo502() throws Exception {
-        when(incentiveService.voucherClaim(eq("AK"), eq("SK")))
+        when(incentiveService.voucherClaim(eq("AK"), eq("SK"), any()))
                 .thenThrow(new SandboxService.HdkitException("HDKIT_INCENTIVE_ERROR",
                         "激励服务查询失败，请稍后重试", null));
 

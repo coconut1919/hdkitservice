@@ -58,7 +58,7 @@ class IncentiveClientTest {
                         "{\"domains\":[{\"id\":\"domain123\",\"name\":\"test\",\"enabled\":true}]}",
                         org.springframework.http.MediaType.APPLICATION_JSON));
 
-        String domainId = client.resolveDomainId("TESTAK", "TESTSK");
+        String domainId = client.resolveDomainIdFromIam("TESTAK", "TESTSK");
         assertEquals("domain123", domainId);
     }
 
@@ -70,7 +70,7 @@ class IncentiveClientTest {
                         org.springframework.http.MediaType.APPLICATION_JSON));
 
         var ex = assertThrows(IncentiveClient.IncentiveException.class,
-                () -> client.resolveDomainId("TESTAK", "TESTSK"));
+                () -> client.resolveDomainIdFromIam("TESTAK", "TESTSK"));
         assertEquals("HDKIT_IAM_ERROR", ex.code());
     }
 
@@ -81,7 +81,7 @@ class IncentiveClientTest {
                 .andRespond(withServerError());
 
         var ex = assertThrows(IncentiveClient.IncentiveException.class,
-                () -> client.resolveDomainId("TESTAK", "TESTSK"));
+                () -> client.resolveDomainIdFromIam("TESTAK", "TESTSK"));
         assertEquals("HDKIT_IAM_ERROR", ex.code());
     }
 
