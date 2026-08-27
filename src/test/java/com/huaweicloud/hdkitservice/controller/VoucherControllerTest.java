@@ -1,7 +1,6 @@
 package com.huaweicloud.hdkitservice.controller;
 
 import com.huaweicloud.hdkitservice.service.IncentiveService;
-import com.huaweicloud.hdkitservice.service.SandboxService;
 import com.huaweicloud.hdkitservice.util.Masker;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,7 +30,7 @@ class VoucherControllerTest {
     private Masker masker;
 
     @Test
-    void voucherStatusEndpoint() throws Exception {
+    void voucherStatusNotClaimed() throws Exception {
         when(incentiveService.voucherStatus(eq("AK"), eq("SK"), any()))
                 .thenReturn(new IncentiveService.VoucherStatusResult(false, "未领取"));
 
@@ -43,7 +42,19 @@ class VoucherControllerTest {
     }
 
     @Test
-    void voucherClaimEndpoint() throws Exception {
+    void voucherStatusWithDomainId() throws Exception {
+        when(incentiveService.voucherStatus(eq("AK"), eq("SK"), eq("test-domain")))
+                .thenReturn(new IncentiveService.VoucherStatusResult(false, "未领取"));
+
+        mvc.perform(get("/rest/developer/server/hdkitservice/voucher/status")
+                        .header("X-HW-AK", "AK").header("X-HW-SK", "SK")
+                        .param("domain_id", "test-domain"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.claimed").value(false));
+    }
+
+    @Test
+    void voucherClaimSuccess() throws Exception {
         when(incentiveService.voucherClaim(eq("AK"), eq("SK"), any()))
                 .thenReturn(new IncentiveService.VoucherClaimResult(true, "v123", 100, "领取成功"));
 
@@ -52,7 +63,21 @@ class VoucherControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.claimed").value(true))
                 .andExpect(jsonPath("$.voucherId").value("v123"))
-                .andExpect(jsonPath("$.amount").value(100));
+                .andExpect(jsonPath("$.amount").value(100))
+                .andExpect(jsonPath("$.message").value("领取成功"));
+    }
+
+    @Test
+    void voucherClaimQuotaExhaustedReturns200() throws Exception {
+        when(incentiveService.voucherClaim(eq("AK"), eq("SK"), any()))
+                .thenReturn(new IncentiveService.VoucherClaimResult(false, null, 0,
+                        "本月代金券总额度已用完，请下月再试"));
+
+        mvc.perform(post("/rest/developer/server/hdkitservice/voucher/claim")
+                        .header("X-HW-AK", "AK").header("X-HW-SK", "SK"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.claimed").value(false))
+                .andExpect(jsonPath("$.message").value("本月代金券总额度已用完，请下月再试"));
     }
 
     @Test
@@ -66,18 +91,6 @@ class VoucherControllerTest {
                         .content("{\"domain_id\":\"test-domain\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.claimed").value(false));
-    }
-
-    @Test
-    void voucherClaimIncentiveErrorMappedTo502() throws Exception {
-        when(incentiveService.voucherClaim(eq("AK"), eq("SK"), any()))
-                .thenThrow(new SandboxService.HdkitException("HDKIT_INCENTIVE_ERROR",
-                        "激励服务查询失败，请稍后重试", null));
-
-        mvc.perform(post("/rest/developer/server/hdkitservice/voucher/claim")
-                        .header("X-HW-AK", "AK").header("X-HW-SK", "SK"))
-                .andExpect(status().isBadGateway())
-                .andExpect(jsonPath("$.code").value("HDKIT_INCENTIVE_ERROR"));
     }
 
     @Test

@@ -18,21 +18,20 @@ public class IncentiveService {
         this.config = config;
     }
 
-    private String resolveDomainId(String ak, String sk, String providedDomainId) {
-        if (!"test".equalsIgnoreCase(config.deployEnv())) {
-            return client.resolveDomainIdFromIam(ak, sk);
-        }
-        if (providedDomainId == null || providedDomainId.isEmpty()) {
-            throw new SandboxService.HdkitException("HDKIT_INVALID_REQUEST",
-                    "测试环境需提供 domain_id", null);
-        }
-        return providedDomainId;
-    }
-
     public VoucherStatusResult voucherStatus(String ak, String sk, String providedDomainId) {
-        String domainId = resolveDomainId(ak, sk, providedDomainId);
-        IncentiveClient.CheckResult check = client.checkCouponIssued(domainId);
+        if ("test".equalsIgnoreCase(config.deployEnv())
+                && (providedDomainId == null || providedDomainId.isEmpty())) {
+            return new VoucherStatusResult(false, "测试环境需提供 domain_id");
+        }
+        String domainId;
+        try {
+            domainId = "test".equalsIgnoreCase(config.deployEnv())
+                    ? providedDomainId : client.resolveDomainIdFromIam(ak, sk);
+        } catch (IncentiveClient.IncentiveException e) {
+            return new VoucherStatusResult(false, "查询失败");
+        }
 
+        IncentiveClient.CheckResult check = client.checkCouponIssued(domainId);
         if (check.serviceError()) {
             return new VoucherStatusResult(false, "查询失败");
         }
@@ -43,12 +42,21 @@ public class IncentiveService {
     }
 
     public VoucherClaimResult voucherClaim(String ak, String sk, String providedDomainId) {
-        String domainId = resolveDomainId(ak, sk, providedDomainId);
+        if ("test".equalsIgnoreCase(config.deployEnv())
+                && (providedDomainId == null || providedDomainId.isEmpty())) {
+            return new VoucherClaimResult(false, null, 0, "测试环境需提供 domain_id");
+        }
+        String domainId;
+        try {
+            domainId = "test".equalsIgnoreCase(config.deployEnv())
+                    ? providedDomainId : client.resolveDomainIdFromIam(ak, sk);
+        } catch (IncentiveClient.IncentiveException e) {
+            return new VoucherClaimResult(false, null, 0, "激励服务查询失败，请稍后重试");
+        }
 
         IncentiveClient.CheckResult check = client.checkCouponIssued(domainId);
         if (check.serviceError()) {
-            throw new SandboxService.HdkitException("HDKIT_INCENTIVE_ERROR",
-                    "激励服务查询失败，请稍后重试", null);
+            return new VoucherClaimResult(false, null, 0, "激励服务查询失败，请稍后重试");
         }
         if (check.issued()) {
             return new VoucherClaimResult(true, null, 0, "已领取过");
@@ -60,15 +68,15 @@ public class IncentiveService {
                 return new VoucherClaimResult(true, null, 0, "已领取过");
             }
             if ("HD.60630042".equals(issue.errorCode())) {
-                throw new SandboxService.HdkitException("HDKIT_INCENTIVE_ERROR",
-                        "本月代金券总额度已用完，请下月再试", null);
+                return new VoucherClaimResult(false, null, 0,
+                        "本月代金券总额度已用完，请下月再试");
             }
             String errMsg = "发券失败: " + issue.error();
             if ("HD.60630022".equals(issue.errorCode())) {
-                errMsg += " 请先完成实名认证：https://account.huaweicloud.com/usercenter/"
+                errMsg = "请先完成实名认证：https://account.huaweicloud.com/usercenter/"
                         + "?region=cn-north-4&locale=zh-cn#/accountindex/realNameAuthing";
             }
-            throw new SandboxService.HdkitException("HDKIT_INCENTIVE_ERROR", errMsg, null);
+            return new VoucherClaimResult(false, null, 0, errMsg);
         }
 
         int amount = Math.min(config.incentiveFaceAmount(), 500);
