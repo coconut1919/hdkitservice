@@ -69,11 +69,11 @@ public class IncentiveService {
             }
             if ("HD.60630042".equals(issue.errorCode())) {
                 return new VoucherClaimResult(false, null, 0,
-                        "本月代金券总额度已用完，请下月再试");
+                        "本月代金券总额度已用完，所有账号均无法领取，请下月再重试");
             }
             String errMsg = "发券失败: " + issue.error();
             if ("HD.60630022".equals(issue.errorCode())) {
-                errMsg = "请先完成实名认证：https://account.huaweicloud.com/usercenter/"
+                errMsg += " 请先完成实名认证：https://account.huaweicloud.com/usercenter/"
                         + "?region=cn-north-4&locale=zh-cn#/accountindex/realNameAuthing";
             }
             return new VoucherClaimResult(false, null, 0, errMsg);

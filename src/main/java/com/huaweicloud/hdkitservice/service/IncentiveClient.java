@@ -9,6 +9,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatusCode;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
@@ -156,16 +158,32 @@ public class IncentiveClient {
         try {
             String token = getAuthToken();
             String appCode = config.incentiveAppCode();
-            String resp = restClient.method(HttpMethod.POST)
+            ResponseEntity<String> resp = restClient.method(HttpMethod.POST)
                     .uri(url)
                     .header("X-APIG-APPCODE", appCode)
                     .header("X-HW-ID", config.incentiveHwId())
                     .header("X-HW-APPKEY", config.incentiveAppKey())
                     .header("X-auth-token", token)
                     .body(body)
-                    .retrieve()
-                    .body(String.class);
-            return mapper.readTree(resp);
+                    .exchange((request, response) -> new ResponseEntity<>(
+                            response.bodyTo(String.class), response.getHeaders(), response.getStatusCode()));
+            HttpStatusCode status = resp.getStatusCode();
+            String respBody = resp.getBody();
+            if (status.isError()) {
+                JsonNode node = null;
+                try {
+                    node = mapper.readTree(respBody);
+                } catch (Exception ignore) {
+                    // 响应体非 JSON，按真正的服务故障处理
+                }
+                if (node != null && node.has("error_code")
+                        && !node.path("error_code").asText().isEmpty()) {
+                    return node;
+                }
+                throw new IllegalStateException("激励服务 HTTP " + status.value()
+                        + (respBody != null && !respBody.isEmpty() ? ": " + respBody : ""));
+            }
+            return mapper.readTree(respBody);
         } catch (Exception e) {
             throw new IncentiveException("HDKIT_INCENTIVE_ERROR",
                     "激励服务调用失败: " + e.getMessage(), e);
