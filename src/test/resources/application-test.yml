@@ -6,8 +6,12 @@ spring:
     driver-class-name: org.h2.Driver
   jpa:
     hibernate:
-      ddl-auto: none
+      ddl-auto: update
     open-in-view: false
     properties:
       hibernate:
         dialect: org.hibernate.dialect.H2Dialect
+
+hdkit:
+  telemetry:
+    salt: "test-salt"
