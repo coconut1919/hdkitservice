@@ -6,6 +6,7 @@ import com.huaweicloud.hdkitservice.util.Masker;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
@@ -18,6 +19,7 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 class IncentiveClientTest {
@@ -166,6 +168,20 @@ class IncentiveClientTest {
         var result = client.issueCoupon("domain123");
         assertFalse(result.success());
         assertEquals("发券失败", result.error());
+    }
+
+    @Test
+    void issueCouponHandlesHttp400BusinessError() {
+        server.expect(requestTo("https://incentive.example.com/issue"))
+                .andExpect(method(HttpMethod.POST))
+                .andRespond(withStatus(HttpStatus.BAD_REQUEST)
+                        .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                        .body("{\"error_code\":\"HD.60720044\",\"error_msg\":\"data is null error, cbc getCustomerInfo error.\"}"));
+
+        var result = client.issueCoupon("domain123");
+        assertFalse(result.success());
+        assertEquals("HD.60720044", result.errorCode());
+        assertEquals("data is null error, cbc getCustomerInfo error.", result.error());
     }
 
     @Test

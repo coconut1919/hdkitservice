@@ -113,7 +113,7 @@ class IncentiveServiceTest {
 
         var result = service.voucherClaim("AK", "SK", null);
         assertFalse(result.claimed());
-        assertTrue(result.message().contains("已用完"));
+        assertEquals("本月代金券总额度已用完，所有账号均无法领取，请下月再重试", result.message());
     }
 
     @Test
@@ -126,7 +126,8 @@ class IncentiveServiceTest {
 
         var result = service.voucherClaim("AK", "SK", null);
         assertFalse(result.claimed());
-        assertTrue(result.message().contains("实名认证"));
+        assertEquals("发券失败: unverified 请先完成实名认证：https://account.huaweicloud.com/usercenter/"
+                + "?region=cn-north-4&locale=zh-cn#/accountindex/realNameAuthing", result.message());
     }
 
     @Test
