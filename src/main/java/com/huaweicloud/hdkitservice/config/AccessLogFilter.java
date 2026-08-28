@@ -32,7 +32,7 @@ public class AccessLogFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
         String traceId = request.getHeader("x-traceID");
-        MDC.put("traceID", (traceId != null && !traceId.isEmpty()) ? traceId : UUID.randomUUID().toString());
+        MDC.put("traceID", (traceId != null && !traceId.isEmpty()) ? traceId : UUID.randomUUID().toString().replace("-", ""));
         ContentCachingRequestWrapper wrapped = new ContentCachingRequestWrapper(request);
         ContentCachingResponseWrapper responseWrapper = new ContentCachingResponseWrapper(response);
         long start = System.currentTimeMillis();
