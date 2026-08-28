@@ -19,8 +19,8 @@ spec:
         - name: swr-secret
       containers:
         - name: server
-          # TODO: 替换为测试 SWR 镜像地址:tag
-          image: swr.cn-south-1.myhuaweicloud.com/<test-org>/hdkitservice:latest
+          # TODO: 替换为带本次改动构建的测试镜像 tag
+          image: swr.cn-south-1.myhuaweicloud.com/huaweicloud-agent/hdkitservice:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 3001
