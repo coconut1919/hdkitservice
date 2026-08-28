@@ -58,7 +58,10 @@ kubectl create secret generic app-secrets -n backend \
 
 ## 步骤 3：部署应用
 
+> 日志持久卷：SFS 按用量计费，首次创建后会持续产生费用。仅在首次部署时执行 PVC 创建。
+
 ```bash
+kubectl apply -f k8s/pvc.yaml        # 创建日志持久卷（仅首次）
 kubectl apply -f k8s/deployment.yaml
 kubectl apply -f k8s/service.yaml
 ```
@@ -67,16 +70,18 @@ kubectl apply -f k8s/service.yaml
 
 ```bash
 kubectl get pods -n backend -l app=hdkitservice
-kubectl logs -n backend -l app=hdkitservice --tail=50
+kubectl exec -n backend -l app=hdkitservice -- tail -n 50 /opt/cloud/logs/hdkitservice/run.log
 ```
 
-预期日志关键行：
+> 本服务日志写入文件（不写控制台），因此用 `kubectl exec ... tail` 查看日志文件，`kubectl logs` 看不到业务日志。
+
+预期日志关键行（`run.log`）：
 
 ```
-HikariPool-1 - Start completed.          # MySQL 连接成功
-Tomcat started on port 3001               # HTTP 服务就绪
 Started HdkitServiceApplication           # 应用启动完成
 ```
+
+MySQL 连接池日志在 `stdout.log`；接口访问日志在 `interface.log`；对外调用日志在 `call.log`。
 
 接口验证（需真实 AK/SK）：
 

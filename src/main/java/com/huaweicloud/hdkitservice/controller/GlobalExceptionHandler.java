@@ -60,7 +60,7 @@ public class GlobalExceptionHandler {
     }
 
     private String traceId() {
-        String requestId = MDC.get("requestId");
-        return requestId != null ? requestId : UUID.randomUUID().toString();
+        String id = MDC.get("traceID");
+        return id != null ? id : UUID.randomUUID().toString();
     }
 }

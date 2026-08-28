@@ -31,8 +31,8 @@ public class AccessLogFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
-        String requestId = UUID.randomUUID().toString();
-        MDC.put("requestId", requestId);
+        String traceId = request.getHeader("x-traceID");
+        MDC.put("traceID", (traceId != null && !traceId.isEmpty()) ? traceId : UUID.randomUUID().toString());
         ContentCachingRequestWrapper wrapped = new ContentCachingRequestWrapper(request);
         ContentCachingResponseWrapper responseWrapper = new ContentCachingResponseWrapper(response);
         long start = System.currentTimeMillis();
@@ -47,8 +47,7 @@ public class AccessLogFilter extends OncePerRequestFilter {
             if (query != null && !query.isEmpty()) {
                 uri = uri + "?" + masker.maskQuery(query);
             }
-            log.info("[interface] {} {} {} status={} dur={}ms ak={} req={} resp={}",
-                    requestId,
+            log.info("[interface] {} {} status={} dur={}ms ak={} req={} resp={}",
                     request.getMethod(),
                     uri,
                     responseWrapper.getStatus(),
@@ -60,7 +59,7 @@ public class AccessLogFilter extends OncePerRequestFilter {
                 responseWrapper.copyBodyToResponse();
             } catch (IOException ignored) {
             }
-            MDC.remove("requestId");
+            MDC.remove("traceID");
         }
     }
 

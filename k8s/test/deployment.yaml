@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: hdkitservice
-  namespace: backend
+  namespace: huaweicloud-agent
   labels:
     app: hdkitservice
 spec:
@@ -19,7 +19,8 @@ spec:
         - name: swr-secret
       containers:
         - name: server
-          image: swr.cn-south-1.myhuaweicloud.com/huaweicloud-devkit-prod/hdkitservice:latest
+          # TODO: 替换为测试 SWR 镜像地址:tag
+          image: swr.cn-south-1.myhuaweicloud.com/<test-org>/hdkitservice:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 3001
