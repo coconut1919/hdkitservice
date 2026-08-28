@@ -47,7 +47,7 @@ class IncentiveClientTest {
 
         RestClient.Builder builder = RestClient.builder();
         server = MockRestServiceServer.bindTo(builder).build();
-        client = new IncentiveClient(config, mapper, new Masker(config), builder);
+        client = new IncentiveClient(config, mapper, new Masker(config), builder.build());
     }
 
     @Test
@@ -201,7 +201,7 @@ class IncentiveClientTest {
     void issueCouponThrowsWhenFaceAmountNotConfigured() {
         config.setIncentiveFaceAmount(0);
         IncentiveClient clientZero = new IncentiveClient(config, mapper, new Masker(config),
-                RestClient.builder());
+                RestClient.builder().build());
 
         var ex = assertThrows(IncentiveClient.IncentiveException.class,
                 () -> clientZero.issueCoupon("domain123"));

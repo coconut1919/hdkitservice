@@ -4,10 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.huaweicloud.hdkitservice.config.HdkitConfig;
 import com.huaweicloud.hdkitservice.sign.Signer;
-import com.huaweicloud.hdkitservice.util.Masker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Component;
@@ -21,34 +19,23 @@ import java.util.Map;
 public class DevStationClient {
 
     private static final Logger log = LoggerFactory.getLogger(DevStationClient.class);
-    private static final Logger callLog = LoggerFactory.getLogger("com.huaweicloud.hdkitservice.call");
 
     private final HdkitConfig config;
     private final ObjectMapper mapper;
-    private final Masker masker;
     private final RestClient restClient;
 
     @Autowired
-    public DevStationClient(HdkitConfig config, ObjectMapper mapper, Masker masker) {
-        this(config, mapper, masker, RestClient.builder());
-    }
-
-    DevStationClient(HdkitConfig config, ObjectMapper mapper, Masker masker, RestClient.Builder builder) {
+    public DevStationClient(HdkitConfig config, ObjectMapper mapper, RestClient restClient) {
         this.config = config;
         this.mapper = mapper;
-        this.masker = masker;
-        this.restClient = builder.baseUrl(config.endpoint())
-                .defaultHeader("Content-Type", "application/json")
-                .build();
+        this.restClient = restClient;
     }
 
     private JsonNode call(String method, String path, String query, String body, String ak, String sk) {
         Signer.SignResult sr = Signer.sign(method, path, query, body == null ? "" : body,
                 ak, sk, config.endpointHost());
-        String uri = path + (query.isEmpty() ? "" : "?" + query);
-        String requestId = MDC.get("requestId");
-        long start = System.currentTimeMillis();
-        callLog.info("[call] {} {} {} req={}", requestId, method, uri, masker.mask(body == null ? "" : body));
+        String base = config.endpoint().replaceFirst("/$", "");
+        String uri = base + path + (query.isEmpty() ? "" : "?" + query);
         try {
             var spec = restClient.method(HttpMethod.valueOf(method))
                     .uri(uri)
@@ -60,24 +47,16 @@ public class DevStationClient {
             String resp = spec.retrieve().body(String.class);
             JsonNode root = mapper.readTree(resp);
             String errorCode = root.path("error_code").asText();
-            long duration = System.currentTimeMillis() - start;
             if (!errorCode.isEmpty() && !"0000".equals(errorCode)) {
                 String errorMsg = root.path("error_msg").asText();
-                callLog.error("[call] {} {} {} <- upstream_error code={} msg={} resp={} dur={}ms",
-                        requestId, method, path, errorCode, errorMsg, masker.mask(resp), duration);
                 log.error("[devstation] {} {} upstream error {}: {}", method, path, errorCode, errorMsg);
                 throw new DevStationException(method + " " + path + " upstream error " + errorCode
                         + ": " + errorMsg, null);
             }
-            callLog.info("[call] {} {} {} <- ok dur={}ms resp={}",
-                    requestId, method, path, duration, masker.mask(resp));
             return root;
         } catch (DevStationException e) {
             throw e;
         } catch (Exception e) {
-            long duration = System.currentTimeMillis() - start;
-            callLog.error("[call] {} {} {} <- failed err={} dur={}ms",
-                    requestId, method, path, masker.mask(e.getMessage()), duration);
             log.error("[devstation] {} {} failed: {}", method, path, e.getMessage());
             throw new DevStationException(method + " " + path + " failed", e);
         }

@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: hdkitservice-logs
+  namespace: backend
+spec:
+  accessModes:
+    - ReadWriteMany
+  # SFS 通用型存储类；若集群实际存储类名不同（如 csi-sfs-turbo），请替换
+  storageClassName: csi-nas
+  resources:
+    requests:
+      storage: 50Gi

@@ -28,20 +28,11 @@ public class IncentiveClient {
     private long cachedIamTokenExpiry;
 
     @Autowired
-    public IncentiveClient(HdkitConfig config, ObjectMapper mapper, Masker masker) {
+    public IncentiveClient(HdkitConfig config, ObjectMapper mapper, Masker masker, RestClient restClient) {
         this.config = config;
         this.mapper = mapper;
         this.masker = masker;
-        this.restClient = RestClient.builder()
-                .defaultHeader("Content-Type", "application/json")
-                .build();
-    }
-
-    IncentiveClient(HdkitConfig config, ObjectMapper mapper, Masker masker, RestClient.Builder builder) {
-        this.config = config;
-        this.mapper = mapper;
-        this.masker = masker;
-        this.restClient = builder.defaultHeader("Content-Type", "application/json").build();
+        this.restClient = restClient;
     }
 
     // ── IAM: 获取 domainId ──
@@ -82,9 +73,6 @@ public class IncentiveClient {
 
     public CheckResult checkCouponIssued(String domainId) {
         String body = buildJson(ob -> ob.put("customer_id", domainId).put("scene_type", 40));
-        String maskedId = masker.mask(domainId);
-        log.info("[incentive] check-coupon REQUEST → {}", config.incentiveCheckUrl());
-        log.info("[incentive] check-coupon BODY → customer_id={} scene_type=40", maskedId);
 
         try {
             JsonNode data = incentiveRequest(config.incentiveCheckUrl(), body);
@@ -122,11 +110,6 @@ public class IncentiveClient {
             ob.put("is_send_notify", "0");
             ob.put("service_resource_type", 1);
         });
-
-        String maskedId = masker.mask(domainId);
-        log.info("[incentive] issue-coupon REQUEST → {}", config.incentiveIssueUrl());
-        log.info("[incentive] issue-coupon BODY → customer_id={} activity_id={} face_amount={}",
-                maskedId, config.incentiveActivityId(), faceAmount);
 
         try {
             JsonNode data = incentiveRequest(config.incentiveIssueUrl(), body);
@@ -216,9 +199,8 @@ public class IncentiveClient {
                 user.put("password", config.incentiveIamPassword());
             });
 
-            var respEntity = RestClient.create().method(HttpMethod.POST)
+            var respEntity = restClient.method(HttpMethod.POST)
                     .uri(endpoint)
-                    .header("Content-Type", "application/json;charset=utf8")
                     .body(body)
                     .retrieve()
                     .toEntity(String.class);
