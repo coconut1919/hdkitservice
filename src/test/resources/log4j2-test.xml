@@ -39,7 +39,7 @@
 
         <RollingFile name="INTERFACE_LOG" fileName="${LOG_HOME}/interface.log"
                 filePattern="${LOG_HOME}/interface/interface.%d{yyyy-MM-dd}.%i.gz">
-            <PatternLayout pattern="%X{traceID}|%enc{%msg}{CRLF}%n%ex"/>
+            <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss SSS}|%X{traceID}|%enc{%msg}{CRLF}%n%ex"/>
             <Policies>
                 <SizeBasedTriggeringPolicy size="${LOG_SIZE}"/>
             </Policies>
@@ -53,7 +53,7 @@
 
         <RollingFile name="CALL_LOG" fileName="${LOG_HOME}/call.log"
                 filePattern="${LOG_HOME}/call/call.%d{yyyy-MM-dd}.%i.gz">
-            <PatternLayout pattern="%X{traceID}|%enc{%msg}{CRLF}%n%ex"/>
+            <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss SSS}|%X{traceID}|%enc{%msg}{CRLF}%n%ex"/>
             <Policies>
                 <SizeBasedTriggeringPolicy size="${LOG_SIZE}"/>
             </Policies>

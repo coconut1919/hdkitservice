@@ -61,6 +61,6 @@ public class GlobalExceptionHandler {
 
     private String traceId() {
         String id = MDC.get("traceID");
-        return id != null ? id : UUID.randomUUID().toString();
+        return id != null ? id : UUID.randomUUID().toString().replace("-", "");
     }
 }
