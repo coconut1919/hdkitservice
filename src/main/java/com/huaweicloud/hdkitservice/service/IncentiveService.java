@@ -18,7 +18,7 @@ public class IncentiveService {
         this.config = config;
     }
 
-    public VoucherStatusResult voucherStatus(String ak, String sk, String providedDomainId) {
+    public VoucherStatusResult voucherStatus(String ak, String sk, String securityToken, String providedDomainId) {
         if ("test".equalsIgnoreCase(config.deployEnv())
                 && (providedDomainId == null || providedDomainId.isEmpty())) {
             return new VoucherStatusResult(false, "测试环境需提供 domain_id");
@@ -26,7 +26,7 @@ public class IncentiveService {
         String domainId;
         try {
             domainId = "test".equalsIgnoreCase(config.deployEnv())
-                    ? providedDomainId : client.resolveDomainIdFromIam(ak, sk);
+                    ? providedDomainId : client.resolveDomainIdFromIam(ak, sk, securityToken);
         } catch (IncentiveClient.IncentiveException e) {
             return new VoucherStatusResult(false, "查询失败");
         }
@@ -41,7 +41,7 @@ public class IncentiveService {
         return new VoucherStatusResult(false, "未领取");
     }
 
-    public VoucherClaimResult voucherClaim(String ak, String sk, String providedDomainId) {
+    public VoucherClaimResult voucherClaim(String ak, String sk, String securityToken, String providedDomainId) {
         if ("test".equalsIgnoreCase(config.deployEnv())
                 && (providedDomainId == null || providedDomainId.isEmpty())) {
             return new VoucherClaimResult(false, null, 0, "测试环境需提供 domain_id");
@@ -49,7 +49,7 @@ public class IncentiveService {
         String domainId;
         try {
             domainId = "test".equalsIgnoreCase(config.deployEnv())
-                    ? providedDomainId : client.resolveDomainIdFromIam(ak, sk);
+                    ? providedDomainId : client.resolveDomainIdFromIam(ak, sk, securityToken);
         } catch (IncentiveClient.IncentiveException e) {
             return new VoucherClaimResult(false, null, 0, "激励服务查询失败，请稍后重试");
         }

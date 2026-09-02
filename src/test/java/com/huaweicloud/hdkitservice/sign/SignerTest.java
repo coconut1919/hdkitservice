@@ -81,4 +81,18 @@ class SignerTest {
                 "TESTAK", "SK_B", "devstation.myhuaweicloud.com", "20260813T000000Z");
         org.junit.jupiter.api.Assertions.assertNotEquals(a.authorization(), b.authorization());
     }
+
+    @Test
+    void signWithTokenIncludesSecurityTokenInSignedHeaders() {
+        Signer.SignResult withToken = Signer.signWithToken(
+                "GET", "/v3/auth/domains", "", "",
+                "TESTAK", "TESTSK", "TEMP-TOKEN", "iam.myhuaweicloud.com");
+        Signer.SignResult noToken = Signer.sign(
+                "GET", "/v3/auth/domains", "", "",
+                "TESTAK", "TESTSK", "iam.myhuaweicloud.com");
+
+        assertTrue(withToken.authorization().startsWith("SDK-HMAC-SHA256 Access=TESTAK, SignedHeaders=host;x-sdk-date;x-security-token, Signature="));
+        assertTrue(noToken.authorization().startsWith("SDK-HMAC-SHA256 Access=TESTAK, SignedHeaders=host;x-sdk-date, Signature="));
+        org.junit.jupiter.api.Assertions.assertNotEquals(withToken.authorization(), noToken.authorization());
+    }
 }

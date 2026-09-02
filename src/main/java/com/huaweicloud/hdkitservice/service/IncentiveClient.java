@@ -37,20 +37,22 @@ public class IncentiveClient {
 
     // ── IAM: 获取 domainId ──
 
-    public String resolveDomainIdFromIam(String ak, String sk) {
+    public String resolveDomainIdFromIam(String ak, String sk, String securityToken) {
         String host = iamDomainsHost();
-        Signer.SignResult sr = Signer.sign("GET", "/v3/auth/domains", "", "", ak, sk, host);
+        Signer.SignResult sr = Signer.signWithToken("GET", "/v3/auth/domains", "", "", ak, sk, securityToken, host);
         String url = config.iamDomainsEndpoint() + "/v3/auth/domains";
 
         log.info("[incentive] resolving domainId via IAM");
         try {
-            String resp = restClient.method(HttpMethod.GET)
+            var req = restClient.method(HttpMethod.GET)
                     .uri(url)
                     .header("Authorization", sr.authorization())
                     .header("X-Sdk-Date", sr.timestamp())
-                    .header("Host", host)
-                    .retrieve()
-                    .body(String.class);
+                    .header("Host", host);
+            if (securityToken != null && !securityToken.isEmpty()) {
+                req.header("X-Security-Token", securityToken);
+            }
+            String resp = req.retrieve().body(String.class);
             JsonNode root = mapper.readTree(resp);
             JsonNode domains = root.path("domains");
             if (domains.isArray() && domains.size() > 0) {

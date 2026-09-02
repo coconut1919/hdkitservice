@@ -28,10 +28,11 @@ public class UserController {
 
     @GetMapping("/user/generatorUserIDHash")
     public ResponseEntity<Map<String, String>> generatorUserIDHash(@RequestHeader("X-HW-AK") String ak,
-                                                                    @RequestHeader("X-HW-SK") String sk) {
+                                                                    @RequestHeader("X-HW-SK") String sk,
+                                                                    @RequestHeader(value = "X-HW-Security-Token", required = false) String securityToken) {
         String domainId;
         try {
-            domainId = incentiveClient.resolveDomainIdFromIam(ak, sk);
+            domainId = incentiveClient.resolveDomainIdFromIam(ak, sk, securityToken);
         } catch (IncentiveClient.IncentiveException e) {
             log.warn("[generatorUserIDHash] IAM failed, using AK fallback: {}", e.getMessage());
             String hash = hashService.generateFallbackUserHash(ak);
