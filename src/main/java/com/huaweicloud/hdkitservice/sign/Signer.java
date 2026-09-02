@@ -37,13 +37,26 @@ public final class Signer {
     public static SignResult sign(String method, String path, String query, String body,
                                   String ak, String sk, String host) {
         String timestamp = FMT.format(ZonedDateTime.now(ZoneOffset.UTC));
-        return sign(method, path, query, body, ak, sk, host, timestamp);
+        return sign(method, path, query, body, ak, sk, null, host, timestamp);
     }
 
     public static SignResult sign(String method, String path, String query, String body,
                                   String ak, String sk, String host, String timestamp) {
-        String signedHeaders = "host;x-sdk-date";
-        String canonicalHeaders = "host:" + host + "\nx-sdk-date:" + timestamp + "\n";
+        return sign(method, path, query, body, ak, sk, null, host, timestamp);
+    }
+
+    public static SignResult signWithToken(String method, String path, String query, String body,
+                                  String ak, String sk, String securityToken, String host) {
+        String timestamp = FMT.format(ZonedDateTime.now(ZoneOffset.UTC));
+        return sign(method, path, query, body, ak, sk, securityToken, host, timestamp);
+    }
+
+    public static SignResult sign(String method, String path, String query, String body,
+                                  String ak, String sk, String securityToken, String host, String timestamp) {
+        boolean hasToken = securityToken != null && !securityToken.isEmpty();
+        String signedHeaders = hasToken ? "host;x-sdk-date;x-security-token" : "host;x-sdk-date";
+        String canonicalHeaders = "host:" + host + "\nx-sdk-date:" + timestamp + "\n"
+                + (hasToken ? "x-security-token:" + securityToken + "\n" : "");
         String uri = path.endsWith("/") ? path : path + "/";
         String canonicalRequest = method + "\n" + uri + "\n" + query + "\n"
                 + canonicalHeaders + "\n" + signedHeaders + "\n" + sha256Hex(body);

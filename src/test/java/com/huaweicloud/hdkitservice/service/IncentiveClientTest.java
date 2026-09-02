@@ -60,7 +60,22 @@ class IncentiveClientTest {
                         "{\"domains\":[{\"id\":\"domain123\",\"name\":\"test\",\"enabled\":true}]}",
                         org.springframework.http.MediaType.APPLICATION_JSON));
 
-        String domainId = client.resolveDomainIdFromIam("TESTAK", "TESTSK");
+        String domainId = client.resolveDomainIdFromIam("TESTAK", "TESTSK", null);
+        assertEquals("domain123", domainId);
+    }
+
+    @Test
+    void resolveDomainIdIncludesSecurityTokenForTemporaryCredentials() {
+        server.expect(requestTo("https://iam.myhuaweicloud.com/v3/auth/domains"))
+                .andExpect(method(HttpMethod.GET))
+                .andExpect(header("X-Security-Token", "TEMP-TOKEN"))
+                .andExpect(header("Authorization",
+                        org.hamcrest.Matchers.containsString("x-security-token")))
+                .andRespond(withSuccess(
+                        "{\"domains\":[{\"id\":\"domain123\",\"name\":\"test\",\"enabled\":true}]}",
+                        org.springframework.http.MediaType.APPLICATION_JSON));
+
+        String domainId = client.resolveDomainIdFromIam("TESTAK", "TESTSK", "TEMP-TOKEN");
         assertEquals("domain123", domainId);
     }
 
@@ -72,7 +87,7 @@ class IncentiveClientTest {
                         org.springframework.http.MediaType.APPLICATION_JSON));
 
         var ex = assertThrows(IncentiveClient.IncentiveException.class,
-                () -> client.resolveDomainIdFromIam("TESTAK", "TESTSK"));
+                () -> client.resolveDomainIdFromIam("TESTAK", "TESTSK", null));
         assertEquals("HDKIT_IAM_ERROR", ex.code());
     }
 
@@ -83,7 +98,7 @@ class IncentiveClientTest {
                 .andRespond(withServerError());
 
         var ex = assertThrows(IncentiveClient.IncentiveException.class,
-                () -> client.resolveDomainIdFromIam("TESTAK", "TESTSK"));
+                () -> client.resolveDomainIdFromIam("TESTAK", "TESTSK", null));
         assertEquals("HDKIT_IAM_ERROR", ex.code());
     }
 

@@ -32,7 +32,7 @@ class UserControllerTest {
 
     @Test
     void generatorUserIDHashWithDomainId() throws Exception {
-        when(incentiveClient.resolveDomainIdFromIam("AK", "SK")).thenReturn("domain123");
+        when(incentiveClient.resolveDomainIdFromIam("AK", "SK", null)).thenReturn("domain123");
         when(hashService.generateUserHash("domain123")).thenReturn("hash123abc");
 
         mvc.perform(get("/rest/developer/server/hdkitservice/user/generatorUserIDHash")
@@ -43,7 +43,7 @@ class UserControllerTest {
 
     @Test
     void generatorUserIDHashIamFailedFallback() throws Exception {
-        when(incentiveClient.resolveDomainIdFromIam("AK", "SK"))
+        when(incentiveClient.resolveDomainIdFromIam("AK", "SK", null))
                 .thenThrow(new IncentiveClient.IncentiveException("HDKIT_IAM_ERROR", "IAM failed", null));
         when(hashService.generateFallbackUserHash("AK")).thenReturn("fallback123");
 
@@ -55,7 +55,7 @@ class UserControllerTest {
 
     @Test
     void generatorUserIDHashDomainIdEmptyFallback() throws Exception {
-        when(incentiveClient.resolveDomainIdFromIam("AK", "SK")).thenReturn("");
+        when(incentiveClient.resolveDomainIdFromIam("AK", "SK", null)).thenReturn("");
         when(hashService.generateFallbackUserHash("AK")).thenReturn("fallback456");
 
         mvc.perform(get("/rest/developer/server/hdkitservice/user/generatorUserIDHash")

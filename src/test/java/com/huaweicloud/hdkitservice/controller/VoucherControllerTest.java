@@ -31,7 +31,7 @@ class VoucherControllerTest {
 
     @Test
     void voucherStatusNotClaimed() throws Exception {
-        when(incentiveService.voucherStatus(eq("AK"), eq("SK"), any()))
+        when(incentiveService.voucherStatus(eq("AK"), eq("SK"), any(), any()))
                 .thenReturn(new IncentiveService.VoucherStatusResult(false, "未领取"));
 
         mvc.perform(get("/rest/developer/server/hdkitservice/voucher/status")
@@ -43,7 +43,7 @@ class VoucherControllerTest {
 
     @Test
     void voucherStatusWithDomainId() throws Exception {
-        when(incentiveService.voucherStatus(eq("AK"), eq("SK"), eq("test-domain")))
+        when(incentiveService.voucherStatus(eq("AK"), eq("SK"), any(), eq("test-domain")))
                 .thenReturn(new IncentiveService.VoucherStatusResult(false, "未领取"));
 
         mvc.perform(get("/rest/developer/server/hdkitservice/voucher/status")
@@ -55,7 +55,7 @@ class VoucherControllerTest {
 
     @Test
     void voucherClaimSuccess() throws Exception {
-        when(incentiveService.voucherClaim(eq("AK"), eq("SK"), any()))
+        when(incentiveService.voucherClaim(eq("AK"), eq("SK"), any(), any()))
                 .thenReturn(new IncentiveService.VoucherClaimResult(true, "v123", 100, "领取成功"));
 
         mvc.perform(post("/rest/developer/server/hdkitservice/voucher/claim")
@@ -69,7 +69,7 @@ class VoucherControllerTest {
 
     @Test
     void voucherClaimQuotaExhaustedReturns200() throws Exception {
-        when(incentiveService.voucherClaim(eq("AK"), eq("SK"), any()))
+        when(incentiveService.voucherClaim(eq("AK"), eq("SK"), any(), any()))
                 .thenReturn(new IncentiveService.VoucherClaimResult(false, null, 0,
                         "本月代金券总额度已用完，请下月再试"));
 
@@ -82,7 +82,7 @@ class VoucherControllerTest {
 
     @Test
     void voucherClaimWithDomainId() throws Exception {
-        when(incentiveService.voucherClaim(eq("AK"), eq("SK"), eq("test-domain")))
+        when(incentiveService.voucherClaim(eq("AK"), eq("SK"), any(), eq("test-domain")))
                 .thenReturn(new IncentiveService.VoucherClaimResult(false, null, 0, "未领取"));
 
         mvc.perform(post("/rest/developer/server/hdkitservice/voucher/claim")

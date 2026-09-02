@@ -25,17 +25,19 @@ public class VoucherController {
     @GetMapping("/voucher/status")
     public VoucherStatusResponse voucherStatus(@RequestHeader("X-HW-AK") String ak,
                                                @RequestHeader("X-HW-SK") String sk,
+                                               @RequestHeader(value = "X-HW-Security-Token", required = false) String securityToken,
                                                @RequestParam(name = "domain_id", required = false) String domainId) {
-        var result = incentiveService.voucherStatus(ak, sk, domainId);
+        var result = incentiveService.voucherStatus(ak, sk, securityToken, domainId);
         return new VoucherStatusResponse(result.claimed(), result.message());
     }
 
     @PostMapping("/voucher/claim")
     public VoucherClaimResponse voucherClaim(@RequestHeader("X-HW-AK") String ak,
                                              @RequestHeader("X-HW-SK") String sk,
+                                             @RequestHeader(value = "X-HW-Security-Token", required = false) String securityToken,
                                              @RequestBody(required = false) VoucherClaimRequest req) {
         String domainId = req != null ? req.domainId() : null;
-        var result = incentiveService.voucherClaim(ak, sk, domainId);
+        var result = incentiveService.voucherClaim(ak, sk, securityToken, domainId);
         return new VoucherClaimResponse(result.claimed(), result.voucherId(), result.amount(), result.message());
     }
 }
