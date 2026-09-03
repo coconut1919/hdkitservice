@@ -124,7 +124,7 @@ public class DashboardService {
         );
     }
 
-    void aggregateMetrics(LocalDate date) {
+    public void aggregateMetrics(LocalDate date) {
         log.info("[dashboard] aggregating metrics for {}", date);
 
         saveMetric(date, KEY_TOTAL_DEVELOERS, telemetryRepo.countDistinctUserHash());
