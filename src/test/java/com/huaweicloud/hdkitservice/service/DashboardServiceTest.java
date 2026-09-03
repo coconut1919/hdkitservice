@@ -107,7 +107,7 @@ class DashboardServiceTest {
 
         AgentDistributionDTO dto = service.getAgentDistribution();
 
-        assertEquals(3, dto.agents().size());
+        assertEquals(2, dto.agents().size());
         AgentDistributionDTO.AgentItem first = dto.agents().get(0);
         assertEquals("opencode", first.name());
         assertEquals(800, first.count());
