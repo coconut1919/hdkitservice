@@ -31,6 +31,10 @@ public class MetricAggregationTask {
         try {
             dashboardService.aggregateMetrics(yesterday);
             dashboardService.aggregateMetrics(LocalDate.now());
+
+            dashboardService.aggregateCapabilityMetrics(yesterday);
+            dashboardService.aggregateCapabilityMetrics(LocalDate.now());
+
             log.info("[metric-aggregation] done");
         } catch (Exception e) {
             log.error("[metric-aggregation] failed: {}", e.getMessage(), e);

@@ -6,7 +6,9 @@ import com.huaweicloud.hdkitservice.model.DownloadSummaryDTO;
 import com.huaweicloud.hdkitservice.model.MetricDaily;
 import com.huaweicloud.hdkitservice.model.NpmDownloadStats;
 import com.huaweicloud.hdkitservice.repository.AgentDistributionDailyRepository;
+import com.huaweicloud.hdkitservice.repository.CapabilityDailyStatsRepository;
 import com.huaweicloud.hdkitservice.repository.MetricDailyRepository;
+import com.huaweicloud.hdkitservice.repository.SkillDailyStatsRepository;
 import com.huaweicloud.hdkitservice.repository.NpmDownloadStatsRepository;
 import com.huaweicloud.hdkitservice.repository.TelemetryEventRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -37,6 +39,10 @@ class DashboardServiceTest {
     private NpmDownloadStatsRepository npmRepo;
     @Mock
     private TelemetryEventRepository telemetryRepo;
+    @Mock
+    private CapabilityDailyStatsRepository capabilityDailyRepo;
+    @Mock
+    private SkillDailyStatsRepository skillDailyRepo;
 
     @InjectMocks
     private DashboardService service;
@@ -78,7 +84,7 @@ class DashboardServiceTest {
         when(telemetryRepo.countDistinctUserHash()).thenReturn(5000L);
         when(telemetryRepo.countDistinctUserHashByDate(any())).thenReturn(300L);
         when(telemetryRepo.countDistinctUserHashSince(any())).thenReturn(2000L);
-        when(telemetryRepo.countDistinctInstallId()).thenReturn(42L);
+        when(telemetryRepo.countDistinctAgentHarness()).thenReturn(42L);
         when(telemetryRepo.dailyActiveUsersSince(any()))
                 .thenReturn(List.<Object[]>of());
 
