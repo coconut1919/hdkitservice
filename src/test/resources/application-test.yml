@@ -15,3 +15,10 @@ spring:
 hdkit:
   telemetry:
     salt: "test-salt"
+
+dashboard:
+  npm-package-name: "@huaweicloud/huaweicloud-devkit"
+  npm-publish-date: "2025-01-01"
+  npm-api-base: "https://api.npmjs.org"
+  aggregation-enabled: false
+  npm-fetch-enabled: false
