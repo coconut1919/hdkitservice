@@ -130,4 +130,12 @@ class MaskerTest {
         assertTrue(masked.endsWith("89"));
         assertTrue(masked.contains("*"));
     }
+
+    @Test
+    void stripsNullAndControlChars() {
+        assertEquals("abc", masker.mask("a\u0000b\u0000c"));
+        assertEquals("{\"x\":\"1\"}", masker.mask("{\"x\":\"1\"}\u0000\u0000\u0000"));
+        assertEquals("keep", masker.mask("keep\u0007"));
+        assertEquals("", masker.mask("\u0000\u0001\u001f\u007f"));
+    }
 }

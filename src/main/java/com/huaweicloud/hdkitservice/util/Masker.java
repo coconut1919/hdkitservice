@@ -25,7 +25,24 @@ public class Masker {
 
     public String mask(String text) {
         if (text == null || text.isEmpty()) return "";
-        return truncate(maskText(text));
+        return truncate(maskText(stripControlChars(text)));
+    }
+
+    /**
+     * 移除 C0 控制字符（{@code \u0000}~{@code \u001F} 及 {@code \u007F}），
+     * 防止 ContentCachingResponseWrapper 读取响应体时带入的 null 填充等
+     * 二进制字符污染日志文件，导致 grep 将文件判定为二进制。
+     */
+    private static String stripControlChars(String s) {
+        if (s == null) return "";
+        StringBuilder sb = new StringBuilder(s.length());
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c >= 0x20 && c != 0x7F) {
+                sb.append(c);
+            }
+        }
+        return sb.toString();
     }
 
     public String maskQuery(String query) {
